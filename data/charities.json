@@ -1,0 +1,26 @@
+[
+    {
+        "id": "fund_001",
+        "name": "MHTC Medical Travel Assistance Fund",
+        "target_audience": ["ASEAN", "International"],
+        "conditions_covered": ["Cardiology", "Oncology", "General"],
+        "max_coverage_usd": 1500,
+        "description": "A fund managed in partnership with MHTC to subsidize travel and accommodation for patients undergoing major surgeries in Malaysia."
+    },
+    {
+        "id": "fund_002",
+        "name": "ASEAN Heart Care Initiative",
+        "target_audience": ["Indonesia", "Vietnam", "Cambodia", "Myanmar"],
+        "conditions_covered": ["Cardiology"],
+        "max_coverage_usd": 3000,
+        "description": "NGO-driven initiative providing financial aid specifically for complex cardiothoracic surgeries for underprivileged ASEAN citizens."
+    },
+    {
+        "id": "fund_003",
+        "name": "MAKNA (National Cancer Council) Support Fund",
+        "target_audience": ["Malaysia", "International Residents"],
+        "conditions_covered": ["Oncology"],
+        "max_coverage_usd": 2000,
+        "description": "Provides financial assistance for cancer treatments, medication, and essential medical equipment for patients in need."
+    }
+]

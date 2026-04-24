@@ -84,3 +84,25 @@ def scrub_pii(data):
             value = re.sub(r'\+?\d{10,12}', '[REDACTED_PHONE]', value)
             data[key] = value
     return data
+
+def scrub_raw_text(text: str) -> str:
+    """Aggressively scrubs raw OCR text to prevent AI safety filters from triggering."""
+    if not text:
+        return text
+        
+    # Mask variations of addresses
+    text = re.sub(r'(?i)ad\s*dress[es]*.*?[\n\r]', '[REDACTED_ADDRESS]\n', text)
+    
+    # Mask License Numbers
+    text = re.sub(r'(?i)license\s*number.*?[\n\r]', '[REDACTED_LICENSE]\n', text)
+    
+    # Mask patient greetings
+    text = re.sub(r'(?i)dear\s+(mr|ms|mrs|dr|me).*?[\n\r:]', 'Dear [REDACTED_NAME]:\n', text)
+    
+    # Generic long numbers (Phones, IDs)
+    text = re.sub(r'\+?\d{8,15}', '[REDACTED_NUMBER]', text)
+    
+    # Dates
+    text = re.sub(r'\d{2}[-/\.]\d{2}[-/\.]\d{4}', '[REDACTED_DATE]', text)
+    
+    return text

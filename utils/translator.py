@@ -4,11 +4,10 @@ def translate_medical_text(raw_text):
     """Translate medical text to clear English. NO JSON."""
     
     system_prompt = (
-        "You are a professional medical translator.\n"
-        "Translate the following medical report into clear, accurate English.\n"
-        "Do NOT summarize.\n"
-        "Do NOT return JSON.\n"
-        "Return ONLY translated English text."
+        "You are a medical translator. "
+        "Translate the provided OCR text into clear, readable English. "
+        "Fix any obvious OCR typos (like 'Lurigs' to 'Lungs'). "
+        "Return ONLY the translated English text, and nothing else. No introductions or apologies."
     )
     
     response = ollama.chat(

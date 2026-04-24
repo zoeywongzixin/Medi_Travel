@@ -16,3 +16,7 @@ numpy==1.26.4
 
 # --- Utilities ---
 python-dotenv==1.0.1
+amadeus==9.0.0
+python-docx==1.1.0
+chromadb==0.4.22
+posthog<3.0.0

@@ -14,6 +14,9 @@ load_dotenv(dotenv_path=env_path)
 TESSERACT_PATH = os.getenv('TESSERACT_PATH', '').strip().replace('"', '')
 POPPLER_BIN = os.getenv('POPPLER_PATH', '').strip().replace('"', '')
 
+if not POPPLER_BIN:
+    POPPLER_BIN = None
+
 # Apply Tesseract configuration
 if TESSERACT_PATH:
     pytesseract.pytesseract.tesseract_cmd = TESSERACT_PATH
@@ -22,7 +25,7 @@ else:
 
 # --- PATH VALIDATION (Debugging) ---
 # This will alert you immediately if the folder doesn't exist
-if not os.path.exists(POPPLER_BIN):
+if POPPLER_BIN and not os.path.exists(POPPLER_BIN):
     print(f"❌ ERROR: Poppler path is incorrect: {POPPLER_BIN}")
 
 # Configure Tesseract path
@@ -42,12 +45,11 @@ def preprocess_image_data(cv_img):
     gray = cv2.cvtColor(cv_img, cv2.COLOR_BGR2GRAY)
     
     # Apply Adaptive Thresholding
-    # This is better for scanned/snapped documents than simple global thresholding
-    distorted = cv2.adaptiveThreshold(
-        gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
-    )
+    # Removing aggressive adaptive thresholding as it corrupts text for Tesseract 4+
+    # Instead, use a mild blur to remove noise while keeping grayscale text intact
+    gray = cv2.medianBlur(gray, 3)
     
-    return Image.fromarray(distorted)
+    return Image.fromarray(gray)
 
 # --- MAIN EXTRACTION ENGINE ---
 
@@ -72,8 +74,8 @@ def extract_raw_text(file_path):
                 open_cv_image = np.array(page)
                 processed_page = preprocess_image_data(open_cv_image)
                 
-                # oem 3 = Default OCR engine, psm 6 = Assume a single uniform block of text
-                custom_config = r'--oem 3 --psm 6'
+                # oem 3 = Default OCR engine, psm 3 = Fully automatic page segmentation (better for varied layouts)
+                custom_config = r'--oem 3 --psm 3'
                 page_text = pytesseract.image_to_string(processed_page, config=custom_config)
                 full_text += f"\n[Page {i+1}]\n{page_text}"
             
@@ -88,7 +90,7 @@ def extract_raw_text(file_path):
             processed_img = preprocess_image_data(img)
             
             # Perform OCR on single image
-            custom_config = r'--oem 3 --psm 6'
+            custom_config = r'--oem 3 --psm 3'
             return pytesseract.image_to_string(processed_img, config=custom_config)
 
     except Exception as e:

@@ -1,80 +1,1926 @@
 
-    <html>
-    <head>
-        <title>Medical AI - Doctor Database</title>
-        <style>
-            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; padding: 20px; }
-            h1 { color: #2c3e50; text-align: center; }
-            .subtitle { text-align: center; color: #7f8c8d; margin-bottom: 30px; }
-            table { width: 100%; border-collapse: collapse; background-color: white; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
-            th, td { padding: 15px; text-align: left; border-bottom: 1px solid #ddd; }
-            th { background-color: #8e44ad; color: white; }
-            tr:hover { background-color: #f5f5f5; }
-            .hosp-badge { background-color: #2980b9; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; }
-            .tier-badge { background-color: #16a085; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; }
-        </style>
-    </head>
-    <body>
-        <h1>🩺 Live Doctor Vector Database (ChromaDB)</h1>
-        <div class="subtitle">Granular Specialist Matching Engine</div>
-        <table>
-            <tr>
-                <th>Doctor Name</th>
-                <th>Sub-Specialty</th>
-                <th>Hospital Affiliation</th>
-                <th>Foreigner Tier</th>
-                <th>Raw RAG Vector (AI Knowledge)</th>
-            </tr>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medical AI - Doctor Vector Database</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary: #ec4899;
+            --accent: #8b5cf6;
+            --background: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background);
+            background-image: 
+                radial-gradient(circle at 0% 0%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 100% 100%, rgba(236, 72, 153, 0.1) 0%, transparent 50%);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding: 40px 20px;
+            line-height: 1.6;
+        }
+
+        h1, h2, h3 {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 700;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 50px;
+            animation: fadeInDown 0.8s ease-out;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            background: linear-gradient(to right, #818cf8, #f472b6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+            animation: fadeIn 1s ease-out;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            padding: 24px;
+            border-radius: 20px;
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(99, 102, 241, 0.4);
+        }
+
+        .stat-value {
+            display: block;
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--primary);
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .stat-label {
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .search-container {
+            margin-bottom: 30px;
+            position: relative;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 16px 24px;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 30px;
+            color: white;
+            font-size: 1rem;
+            outline: none;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(12px);
+        }
+
+        .search-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.2);
+        }
+
+        .table-container {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            overflow: hidden;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+            animation: fadeInUp 1s ease-out;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            background: rgba(255, 255, 255, 0.03);
+            text-align: left;
+            padding: 20px;
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 1px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        td {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .doctor-name {
+            font-weight: 600;
+            color: var(--text-main);
+            display: block;
+        }
+
+        .specialty {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .hosp-badge {
+            background: rgba(99, 102, 241, 0.1);
+            color: #818cf8;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            border: 1px solid rgba(99, 102, 241, 0.2);
+        }
+
+        .tier-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .tier-premium {
+            background: rgba(236, 72, 153, 0.1);
+            color: #f472b6;
+            border: 1px solid rgba(236, 72, 153, 0.2);
+        }
+
+        .tier-gov {
+            background: rgba(16, 185, 129, 0.1);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .tier-standard {
+            background: rgba(245, 158, 11, 0.1);
+            color: #fbbf24;
+            border: 1px solid rgba(245, 158, 11, 0.2);
+        }
+
+        .mmc-link {
+            color: var(--primary);
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: color 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .mmc-link:hover {
+            color: var(--secondary);
+        }
+
+        .reg-info {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-family: monospace;
+        }
+
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @media (max-width: 768px) {
+            .stats-grid { grid-template-columns: 1fr; }
+            th:nth-child(4), td:nth-child(4),
+            th:nth-child(5), td:nth-child(5) { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>🩺 Doctor Registry</h1>
+            <p>Live Vector Database from MMC MeRITS. Powering Malaysia's Medical Tourism Matching Engine.</p>
+        </header>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <span class="stat-value">72</span>
+                <span class="stat-label">Verified Doctors</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value">45</span>
+                <span class="stat-label">Active Hospitals</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value">Live</span>
+                <span class="stat-label">Vector Sync</span>
+            </div>
+        </div>
+
+        <div class="search-container">
+            <input type="text" class="search-input" id="doctorSearch" placeholder="Search by name, hospital, or specialty..." onkeyup="filterTable()">
+        </div>
+
+        <div class="table-container">
+            <table id="doctorTable">
+                <thead>
+                    <tr>
+                        <th>Doctor Detail</th>
+                        <th>Hospital</th>
+                        <th>Foreigner Tier</th>
+                        <th>Registration</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
     
-            <tr>
-                <td><strong>Dr. Ahmad Nizar Jamaluddin</strong></td>
-                <td>Interventional Cardiology</td>
-                <td><span class="hosp-badge">Prince Court Medical Centre</span></td>
-                <td><span class="tier-badge">Premium Private</span></td>
-                <td style="font-size: 13px; color: #555;">Doctor Name: Dr. Ahmad Nizar Jamaluddin<br>Sub-Specialty: Interventional Cardiology<br>Affiliated Hospital: Prince Court Medical Centre<br>Medical Tourist Tier: Premium Private<br>Foreigner Pricing: Luxury experience, highest foreigner rates. Est: USD $150 - $300.</td>
-            </tr>
+                    <tr>
+                        <td>
+                            <span class="doctor-name">MOHD ROSLAN B HARON</span>
+                            <span class="specialty">Medical Oncology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">TUNKU LAKSMANA JOHOR CANCER CENTRE</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-premium">Premium Private</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 13799<br>
+                            FRN: 24379
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/17804/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
         
-            <tr>
-                <td><strong>Dato' Dr. David Chew</strong></td>
-                <td>Electrophysiology (Cardiology)</td>
-                <td><span class="hosp-badge">Gleneagles Hospital</span></td>
-                <td><span class="tier-badge">Premium Private</span></td>
-                <td style="font-size: 13px; color: #555;">Doctor Name: Dato' Dr. David Chew<br>Sub-Specialty: Electrophysiology (Cardiology)<br>Affiliated Hospital: Gleneagles Hospital<br>Medical Tourist Tier: Premium Private<br>Foreigner Pricing: Luxury experience, highest foreigner rates. Est: USD $150 - $300.</td>
-            </tr>
+                    <tr>
+                        <td>
+                            <span class="doctor-name">LIM CHIN CHYE</span>
+                            <span class="specialty">Medical Oncology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">INSTITUT KANSER NEGARA</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 14883<br>
+                            FRN: 25605
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/17721/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
         
-            <tr>
-                <td><strong>Dr. Azura Deniel</strong></td>
-                <td>Clinical Oncology (Breast Cancer)</td>
-                <td><span class="hosp-badge">Institut Kanser Negara (IKN)</span></td>
-                <td><span class="tier-badge">Government / Semi-Gov</span></td>
-                <td style="font-size: 13px; color: #555;">Doctor Name: Dr. Azura Deniel<br>Sub-Specialty: Clinical Oncology (Breast Cancer)<br>Affiliated Hospital: Institut Kanser Negara (IKN)<br>Medical Tourist Tier: Government / Semi-Gov<br>Foreigner Pricing: High-quality specialized care. Rates are NOT subsidized for foreigners. Est: USD $50 - $100. May have longer wait times.</td>
-            </tr>
+                    <tr>
+                        <td>
+                            <span class="doctor-name">NORSHIDAH BT ABDULLAH</span>
+                            <span class="specialty">Medical Oncology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">institut kanser negara</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 17135<br>
+                            FRN: 28308
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/3128/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
         
-            <tr>
-                <td><strong>Datuk Dr. Sanjiv Joshi</strong></td>
-                <td>Paediatric Cardiology</td>
-                <td><span class="hosp-badge">Pantai Hospital</span></td>
-                <td><span class="tier-badge">Standard Private</span></td>
-                <td style="font-size: 13px; color: #555;">Doctor Name: Datuk Dr. Sanjiv Joshi<br>Sub-Specialty: Paediatric Cardiology<br>Affiliated Hospital: Pantai Hospital<br>Medical Tourist Tier: Standard Private<br>Foreigner Pricing: Fast service, standard foreigner rates. Est: USD $80 - $150.</td>
-            </tr>
+                    <tr>
+                        <td>
+                            <span class="doctor-name">NAHJATUL KURSYIAH ABD GHAFAR</span>
+                            <span class="specialty">Medical Oncology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">HOSPITAL WANITA DAN KANAK-KANAK SABAH</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 32563<br>
+                            FRN: 45183
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/27713/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
         
-            <tr>
-                <td><strong>Dr. Chong Kwang</strong></td>
-                <td>Medical Oncology</td>
-                <td><span class="hosp-badge">Sunway Medical Centre</span></td>
-                <td><span class="tier-badge">Standard Private</span></td>
-                <td style="font-size: 13px; color: #555;">Doctor Name: Dr. Chong Kwang<br>Sub-Specialty: Medical Oncology<br>Affiliated Hospital: Sunway Medical Centre<br>Medical Tourist Tier: Standard Private<br>Foreigner Pricing: Fast service, standard foreigner rates. Est: USD $80 - $150.</td>
-            </tr>
+                    <tr>
+                        <td>
+                            <span class="doctor-name">AZURA BT DENIEL</span>
+                            <span class="specialty">Medical Oncology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">AMPANG PUTERI SPECIALIST HOSPITAL</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-premium">Premium Private</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: -<br>
+                            FRN: 34669
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/20472/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
         
-            <tr>
-                <td><strong>Dr. Tan Jian</strong></td>
-                <td>Cardiothoracic Surgery</td>
-                <td><span class="hosp-badge">Institut Jantung Negara (IJN)</span></td>
-                <td><span class="tier-badge">Government / Semi-Gov</span></td>
-                <td style="font-size: 13px; color: #555;">Doctor Name: Dr. Tan Jian<br>Sub-Specialty: Cardiothoracic Surgery<br>Affiliated Hospital: Institut Jantung Negara (IJN)<br>Medical Tourist Tier: Government / Semi-Gov<br>Foreigner Pricing: High-quality specialized care. Rates are NOT subsidized for foreigners. Est: USD $50 - $100. May have longer wait times.</td>
-            </tr>
+                    <tr>
+                        <td>
+                            <span class="doctor-name">JAMIL B OMAR</span>
+                            <span class="specialty">Medical Oncology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">INSTITUT KANSER NEGARA</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 20792<br>
+                            FRN: 32625
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/3215/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
         
-        </table>
-    </body>
-    </html>
+                    <tr>
+                        <td>
+                            <span class="doctor-name">SITI ZALEHA BT MD SANI</span>
+                            <span class="specialty">Medical Oncology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">HOSPITAL KUALA LUMPUR</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 25162<br>
+                            FRN: 37713
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/5956/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">HAYANI BINTI ABDUL WAHID</span>
+                            <span class="specialty">Medical Oncology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">MAHKOTA MEDICAL CENTRE</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-standard">Standard Private</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 25679<br>
+                            FRN: 37473
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/5821/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">HAFIZAH ZAHARAH BT AHMAD</span>
+                            <span class="specialty">Medical Oncology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">SUNWAY MEDICAL CENTRE VELOCITY</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-standard">Standard Private</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 25780<br>
+                            FRN: 37985
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/6089/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">IBTISAM BINTI MUHAMAD NOR</span>
+                            <span class="specialty">Medical Oncology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">HOSPITAL KUALA LUMPUR</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-premium">Premium Private</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 26346<br>
+                            FRN: 38322
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/21820/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">ATIKI FALPARADO BIN AHMAD</span>
+                            <span class="specialty">Medical Oncology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">KPJ Selangor Specialist Hospital</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-standard">Standard Private</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 26557<br>
+                            FRN: 38326
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/21821/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">NATASHA BINTI MOHD HASHIM</span>
+                            <span class="specialty">Medical Oncology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">JOHOR SPECIALIST HOSPITAL</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-standard">Standard Private</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 27185<br>
+                            FRN: 39511
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/7501/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">SUHANA BINTI YUSAK</span>
+                            <span class="specialty">Medical Oncology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">INSTITUT KANSER NEGARA</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 27326<br>
+                            FRN: 39281
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/7383/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">MOHD NORAZAM B MOHD ABAS</span>
+                            <span class="specialty">Medical Oncology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">INSTITUT KANSER NEGARA</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 29370<br>
+                            FRN: 41773
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/22884/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">LAU FEN NEE</span>
+                            <span class="specialty">Medical Oncology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">CURIE ONCOLOGY CENTRE</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 30524<br>
+                            FRN: 30524
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/3004/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">LEE BOON NANG</span>
+                            <span class="specialty">Medical Oncology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">AMPANG PUTERI SPECIALIST HOSPITAL</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-standard">Standard Private</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 14941<br>
+                            FRN: 25581
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/17783/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">TAN LIP BOON</span>
+                            <span class="specialty">Medical Oncology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">UNIVERSITY OF CYBERJAYA</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 15855<br>
+                            FRN: 26504
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/16961/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">NORAINI BT ABD RAHIM</span>
+                            <span class="specialty">Medical Oncology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">UNIVERSITY OF CYBERJAYA</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 16729<br>
+                            FRN: 27569
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/3133/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">ASMAYANI BINTI KHALIB</span>
+                            <span class="specialty">Medical Oncology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">Kementerian Kesihatan Malaysia</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 16593<br>
+                            FRN: 27622
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/8533/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">SAZILAH BT AHMAD SARJI</span>
+                            <span class="specialty">Medical Oncology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">PROGRAM SARINGAN KANSER PAYUDARA BERGERAK MAKNA</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 16860<br>
+                            FRN: 27867
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/9527/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">AZIZAH BT HJ AB MANAN</span>
+                            <span class="specialty">Medical Oncology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">Jabatan Kesihatan Negeri Pulau Pinang</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 16799<br>
+                            FRN: 27773
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/2073/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">NOR AZLIN BT DAHLAN</span>
+                            <span class="specialty">Medical Oncology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">INSTITUT KANSER NEGARA</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 19840<br>
+                            FRN: 31152
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/1795/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">NG CHEN SIEW</span>
+                            <span class="specialty">Medical Oncology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">HOSPITAL SULTANAH AMINAH</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-premium">Premium Private</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 19993<br>
+                            FRN: 31434
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/1980/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">NOR SALITA BT ALI</span>
+                            <span class="specialty">Medical Oncology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">INSTITUT KANSER NEGARA</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 21007<br>
+                            FRN: 32248
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/2719/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">NORZAINI ROSE BT MOHD ZAIN</span>
+                            <span class="specialty">Medical Oncology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">INSTITUT KANSER NEGARA</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 21012<br>
+                            FRN: 32326
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/2154/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">MOHAMMAD SHUKRI B JAHIT</span>
+                            <span class="specialty">Medical Oncology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">INSTITUT KANSER NEGARA</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 20186<br>
+                            FRN: 31345
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/2249/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">ZAHURIN BT ISMAIL</span>
+                            <span class="specialty">Medical Oncology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">HOSPITAL PUTRAJAYA</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 20106<br>
+                            FRN: 31327
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/196/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">NUR ASLINA BT BAHAKODIN</span>
+                            <span class="specialty">Medical Oncology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">INSTITUT KANSER NEGARA</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 22360<br>
+                            FRN: 33845
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/9324/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">FATIN HAYYANI BINTI MOHAMAD NAJIB</span>
+                            <span class="specialty">Radiation Oncology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">INSTITUT KANSER NEGARA</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 32555<br>
+                            FRN: 46995
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/27882/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">MALWINDER SINGH SANDHU</span>
+                            <span class="specialty">Radiation Oncology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">PANTAI HOSPITAL KLANG</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-premium">Premium Private</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: NA<br>
+                            FRN: 43916
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/25704/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">TEOH CHUAN WUI</span>
+                            <span class="specialty">Radiation Oncology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">HOSPITAL WANITA DAN KANAK-KANAK SABAH</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 31642<br>
+                            FRN: 44139
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/28273/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">NG BOON HUAT</span>
+                            <span class="specialty">Radiation Oncology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">IIUM Medical Specialist Centre</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-standard">Standard Private</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 31492<br>
+                            FRN: 43845
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/28329/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">HO CHON HOO</span>
+                            <span class="specialty">General Medicine</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">REGENCY SPECIALIST HOSPITAL SDN BHD</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-standard">Standard Private</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: -<br>
+                            FRN: 52658
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/33452/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">VASUNTHA DEVI A/P BALAMORGAN</span>
+                            <span class="specialty">Cardiothoracic Surgery</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">HOSPITAL SULTANAH AMINAH</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 38614<br>
+                            FRN: 54511
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/37895/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">CALVIN LAU KUOK WEI</span>
+                            <span class="specialty">General Surgery</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">Clinic Lau And Choong</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 39828<br>
+                            FRN: 53851
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/39371/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">TANGALAKSHMI A/P SANMUGALINGAM</span>
+                            <span class="specialty">General Medicine</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">LINGAM FAMILY CLINIC</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 45601<br>
+                            FRN: 59425
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/45966/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">ANG YU JAAN</span>
+                            <span class="specialty">General Medicine</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">Clinic Friends & Family</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 58087<br>
+                            FRN: 70620
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/59587/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">ABDULLAH MOKHZANI BIN SOLAHUDIN</span>
+                            <span class="specialty">General Medicine</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">KLINIK DADDY</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 59294<br>
+                            FRN: 71297
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/60871/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">SUGANTHI RANI A/P SUBRAMANIAM</span>
+                            <span class="specialty">General Medicine</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">HOSPITAL PULAU PINANG</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 59566<br>
+                            FRN: 71833
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/61152/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">AISHAH SORAYA BINTI SOLAHUDIN</span>
+                            <span class="specialty">Cardiology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">INSTITUT JANTUNG NEGARA</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 62320<br>
+                            FRN: 74540
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/64155/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">WAN HANIZA BINTI WAN MOHAMAD</span>
+                            <span class="specialty">Pulmonology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">Mahkota Medical Centre</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-standard">Standard Private</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: -<br>
+                            FRN: 46298
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/35006/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">THINAGARI RANI A/P PETER JOSEPH ROY</span>
+                            <span class="specialty">Pulmonology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">HOSPITAL RAJA PERMAISURI BAINUN</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 58923<br>
+                            FRN: 71692
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/60462/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">SITI KHAIRANI BT ZAINAL ABIDIN</span>
+                            <span class="specialty">Cardiology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">HOSPITAL TENGKU AMPUAN AFZAN</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 21626<br>
+                            FRN: 33449
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/3286/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">ASRI RANGA BIN ABDULLAH RAMAIAH</span>
+                            <span class="specialty">Cardiology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">HOSPITAL SERDANG</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 21461<br>
+                            FRN: 34288
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/3413/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">ZULKIFLI B. MUSTAPHA</span>
+                            <span class="specialty">Cardiology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">HOSPITAL RAJA PEREMPUAN ZAINAB II</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 21995<br>
+                            FRN: 38387
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/5226/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">NOR HANIM BT MOHD AMIN</span>
+                            <span class="specialty">Cardiology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">HOSPITAL RAJA PERMAISURI BAINUN</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 23293<br>
+                            FRN: 35079
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/3789/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">EMMA BINTI YAAKOP</span>
+                            <span class="specialty">Cardiology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">HOSPITAL SULTAN IDRIS SHAH</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 32338<br>
+                            FRN: 44433
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/25785/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">BENJAMIN LEO CHEANG LENG</span>
+                            <span class="specialty">Cardiology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">KPJ Johor Specialist Hospital</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-standard">Standard Private</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 23698<br>
+                            FRN: 35221
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/4054/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">MEGHARAJAN @ IGAT A/L RAMAMURTHY</span>
+                            <span class="specialty">Cardiology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">HOSPITAL PULAU PINANG</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 23386<br>
+                            FRN: 35528
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/4143/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">LIEW HOUNG BANG</span>
+                            <span class="specialty">Cardiology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">HOSPITAL QUEEN ELIZABETH II</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: NA<br>
+                            FRN: 31256
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/17729/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">ABD KAHAR B ABD GHAPAR</span>
+                            <span class="specialty">Cardiology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">Klinik Hartati</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 17731<br>
+                            FRN: 29762
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/419/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">ANWAR IRAWAN BIN RUHANI</span>
+                            <span class="specialty">Cardiology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">HOSPITAL TENGKU AMPUAN AFZAN</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 25247<br>
+                            FRN: 36799
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/11992/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">NOOR DARINAH BT MOHD DARIL</span>
+                            <span class="specialty">Cardiology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">HOSPITAL SULTAN IDRIS SHAH</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 25611<br>
+                            FRN: 37413
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/5920/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">ABD SYUKUR BIN ABDULLAH</span>
+                            <span class="specialty">Cardiology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">HOSPITAL SULTANAH BAHIYAH</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: -<br>
+                            FRN: 37951
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/5608/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">KAMARAJ A/L SELVARAJ</span>
+                            <span class="specialty">Cardiology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">HOSPITAL SERDANG</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 26332<br>
+                            FRN: 38261
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/22361/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">SHAHIDI BIN JAMALUDIN</span>
+                            <span class="specialty">Cardiology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">PASIR GUDANG SPECIALIST HOSPITAL</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-standard">Standard Private</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 26291<br>
+                            FRN: 38102
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/5834/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">GUNASEKARAN A/L RAMSAMY</span>
+                            <span class="specialty">Cardiology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">PUTERI SPECIALIST HOSPITAL</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-standard">Standard Private</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 26534<br>
+                            FRN: 38394
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/22517/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">KOH CHAN SING</span>
+                            <span class="specialty">Cardiology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">Hospital Seri Botani</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-standard">Standard Private</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 12040<br>
+                            FRN: 22491
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/11655/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">NG KENG TIAN</span>
+                            <span class="specialty">Cardiology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">KT NG Cardiology Clinic</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-premium">Premium Private</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 16293<br>
+                            FRN: 27281
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/17032/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">LU HOU TEE</span>
+                            <span class="specialty">Cardiology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">HT  LU Cardiology Specialist Clinic</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-standard">Standard Private</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 24278<br>
+                            FRN: 36894
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/9635/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">MOHAMMAD TAMIM BIN JAMIL</span>
+                            <span class="specialty">Cardiology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">HOSPITAL PULAU PINANG</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-premium">Premium Private</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 25029<br>
+                            FRN: 38125
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/6061/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">MA KIAN FUNG @ GORDON</span>
+                            <span class="specialty">Cardiology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">JESSELTON MEDICAL CENTRE SDN. BHD.</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-premium">Premium Private</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 31471<br>
+                            FRN: 43731
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/25896/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">LEE CHUEY YAN</span>
+                            <span class="specialty">Cardiology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">HOSPITAL SULTANAH AMINAH</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 16273<br>
+                            FRN: 27076
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/16781/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">KOAY HAN SIANG</span>
+                            <span class="specialty">Cardiology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">Loh Guan Lye Specialists Centre</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-standard">Standard Private</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 33487<br>
+                            FRN: 45961
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/30891/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">KONG POI KEONG</span>
+                            <span class="specialty">Cardiology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">HOSPITAL PULAU PINANG</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: -<br>
+                            FRN: 49955
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/35598/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">DHANI DARSHAN FRANCIS</span>
+                            <span class="specialty">Cardiology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">HOSPITAL TENGKU AMPUAN AFZAN</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 38351<br>
+                            FRN: 51634
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/37543/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">KIM HENG SHEE</span>
+                            <span class="specialty">Cardiology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">HOSPITAL SULTANAH AMINAH</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 41347<br>
+                            FRN: 54326
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/40842/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">SAHRIN BIN SAHARUDIN</span>
+                            <span class="specialty">Cardiology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">HOSPITAL QUEEN ELIZABETH II</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 44313<br>
+                            FRN: 57996
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/44268/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">AHMAD ADLI BIN MOHD SOFIAN</span>
+                            <span class="specialty">Cardiology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">SUNWAY MEDICAL CENTRE</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-standard">Standard Private</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 48666<br>
+                            FRN: 63075
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/49656/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">NURUL LIYANA BINTI OTHMAN</span>
+                            <span class="specialty">Cardiology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">HOSPITAL PULAU PINANG</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 49629<br>
+                            FRN: 63327
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/50644/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">KHOR MIN TZE</span>
+                            <span class="specialty">Cardiology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">Sena Clinic</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-standard">Standard Private</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 55692<br>
+                            FRN: 68337
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/57264/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="doctor-name">MOGANAH A/P NADARAJAH</span>
+                            <span class="specialty">Cardiology</span>
+                        </td>
+                        <td>
+                            <span class="hosp-badge">HOSPITAL PULAU PINANG</span>
+                        </td>
+                        <td>
+                            <span class="tier-badge tier-gov">Government / Semi-Gov</span>
+                        </td>
+                        <td class="reg-info">
+                            PRN: 56749<br>
+                            FRN: 69445
+                        </td>
+                        <td>
+                            <a href="https://merits.mmc.gov.my/viewDoctor/58365/search" target="_blank" class="mmc-link">
+                                View Profile ↗
+                            </a>
+                        </td>
+                    </tr>
+        
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        function filterTable() {
+            var input, filter, table, tr, td, i, txtValue;
+            input = document.getElementById("doctorSearch");
+            filter = input.value.toUpperCase();
+            table = document.getElementById("doctorTable");
+            tr = table.getElementsByTagName("tr");
+
+            for (i = 1; i < tr.length; i++) {
+                var match = false;
+                var cells = tr[i].getElementsByTagName("td");
+                for(var j=0; j < cells.length - 1; j++) {
+                    if (cells[j]) {
+                        txtValue = cells[j].textContent || cells[j].innerText;
+                        if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                            match = true;
+                            break;
+                        }
+                    }
+                }
+                if (match) {
+                    tr[i].style.display = "";
+                } else {
+                    tr[i].style.display = "none";
+                }
+            }
+        }
+    </script>
+</body>
+</html>
     

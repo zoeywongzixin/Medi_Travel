@@ -10,8 +10,7 @@ from utils.parser import get_concise_json
 
 # 🔹 Agents
 from agents.logistics_analyzer import get_transport_requirements
-from agents.transport_recommendation import recommend_transport
-from agents.transport_agent import get_real_time_transport
+from agents.flight_agent import get_flight_options
 
 
 # 🔒 PII Scrubber
@@ -54,23 +53,11 @@ def run_full_pipeline(file_path, country="Thailand"):
         "logistics": logistics_data
     }
 
-    # 🧠 STEP 5: CORE TRANSPORT DECISION ENGINE
-    print("\n--- 5. Generating Transport Recommendation ---")
-    transport_plan = recommend_transport(logistics_data, country)
+    # 🧠 STEP 5: CORE TRANSPORT DECISION ENGINE (Amadeus API)
+    print("\n--- 5. Generating Flight/Transport Recommendation (via Amadeus) ---")
+    transport_plan = get_flight_options(logistics_data, country)
 
     final_output["transport_recommendation"] = transport_plan
-
-    # 🌐 STEP 6: OPTIONAL ENRICHMENT (Crawler)
-    print("\n--- 6. Fetching Real-Time Transport Providers (Optional) ---")
-    try:
-        real_time_results = asyncio.run(
-            get_real_time_transport(logistics_data)  # ✅ pass context
-        )
-        final_output["real_time_options"] = real_time_results
-
-    except Exception as e:
-        print(f"❌ Transport Agent Error: {e}")
-        final_output["real_time_options"] = "Enrichment failed"
 
     # 🔍 Debug before scrubbing
     print(f"\nDEBUG: Final output BEFORE scrubbing:\n{json.dumps(final_output, indent=2)}")

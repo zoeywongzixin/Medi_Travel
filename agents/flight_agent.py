@@ -1,71 +1,102 @@
 import os
 from typing import Dict, List
-from amadeus import Client, ResponseError
+from serpapi import Client
 from dotenv import load_dotenv
 
 load_dotenv()
 
-AMADEUS_API_KEY = os.getenv("AMADEUS_API_KEY")
-AMADEUS_API_SECRET = os.getenv("AMADEUS_API_SECRET")
+SERPAPI_KEY = os.getenv("SERPAPI_KEY")
 
-def get_amadeus_client():
-    if not AMADEUS_API_KEY or not AMADEUS_API_SECRET:
+def get_serpapi_client():
+    if not SERPAPI_KEY:
         return None
     try:
-        return Client(
-            client_id=AMADEUS_API_KEY,
-            client_secret=AMADEUS_API_SECRET
-        )
+        return Client(api_key=SERPAPI_KEY)
     except Exception as e:
-        print(f"Amadeus Client Error: {e}")
+        print(f"SerpApi Client Error: {e}")
         return None
 
-def find_flights(origin_country: str, destination_airport: str = "KUL", date: str = "2024-12-01") -> List[Dict]:
+def find_flights(origin_country: str, destination_airport: str = "KUL", date: str = None, adults: int = 1, max_offers: int = 3) -> List[Dict]:
     """
-    Uses Amadeus Flight Offers Search API to find flights.
-    Mocks the response if Amadeus is not configured or fails.
+    Uses SerpApi Google Flights to find real flights.
+    Mocks the response if SerpApi is not configured or fails.
     """
-    # Simple mapping for ASEAN origins to IATA codes (for demo purposes)
+    if date is None:
+        from datetime import datetime
+        date = datetime.now().strftime("%Y-%m-%d")
+        
+    # Mapping for all 11 ASEAN countries to IATA codes
     iata_mapping = {
-        "thailand": "BKK",
+        "brunei": "BWN",
+        "cambodia": "PNH",
         "indonesia": "CGK",
-        "vietnam": "SGN",
+        "laos": "VTE",
+        "malaysia": "KUL",
+        "myanmar": "RGN",
+        "philippines": "MNL",
         "singapore": "SIN",
-        "philippines": "MNL"
+        "thailand": "BKK",
+        "timor-leste": "DIL",
+        "vietnam": "SGN"
     }
     
     origin_airport = iata_mapping.get(origin_country.lower(), "BKK")
     
-    amadeus = get_amadeus_client()
+    serpapi_client = get_serpapi_client()
     
-    if amadeus:
+    if serpapi_client:
         try:
-            response = amadeus.shopping.flight_offers_search.get(
-                originLocationCode=origin_airport,
-                destinationLocationCode=destination_airport,
-                departureDate=date,
-                adults=1,
-                max=3
-            )
+            params = {
+                "engine": "google_flights",
+                "departure_id": origin_airport,
+                "arrival_id": destination_airport,
+                "outbound_date": date,
+                "currency": "USD",
+                "hl": "en",
+                "adults": adults,
+                "type": "2" # One Way
+            }
+            
+            response = serpapi_client.search(params)
+            
+            best_flights = response.get("best_flights", [])
+            other_flights = response.get("other_flights", [])
+            all_offers = best_flights + other_flights
             
             flights = []
-            for offer in response.data:
-                price = offer['price']['total']
-                currency = offer['price']['currency']
-                airline = offer['validatingAirlineCodes'][0] if offer['validatingAirlineCodes'] else "Unknown"
+            for offer in all_offers[:max_offers]:
+                price = offer.get('price', 'Unknown')
+                flights_info = offer.get('flights', [])
+                
+                airline = "Unknown"
+                departing_at = "Unknown"
+                arriving_at = "Unknown"
+                
+                if flights_info:
+                    airline = flights_info[0].get('airline', 'Unknown')
+                    departing_at = flights_info[0].get("departure_airport", {}).get("time", "Unknown")
+                    # Use last segment for arrival if there are connections
+                    arriving_at = flights_info[-1].get("arrival_airport", {}).get("time", "Unknown")
+                
+                price_str = f"{price} USD" if isinstance(price, (int, float)) else str(price)
+                
                 flights.append({
                     "airline": airline,
-                    "price": f"{price} {currency}",
-                    "type": "Commercial Flight (API)"
+                    "price": price_str,
+                    "departure": departing_at,
+                    "arrival": arriving_at,
+                    "type": "Commercial Flight (Google Flights)"
                 })
-            return flights
-        except ResponseError as error:
-            print(f"Amadeus API Error: {error}")
+            
+            if flights:
+                return flights
+        except Exception as error:
+            print(f"SerpApi Error: {error}")
             # Fallback to mock if API fails
             pass
             
     # Mock fallback
-    print("⚠️ Using mock flight data (Amadeus API not configured or failed)")
+    print("⚠️ Using mock flight data (SerpApi not configured or failed)")
     return [
         {
             "airline": "AirAsia (Mock)",
@@ -84,22 +115,45 @@ def get_flight_options(logistics_data: Dict, origin_country: str) -> Dict:
     Analyzes logistics requirements and fetches appropriate flights.
     """
     mobility = logistics_data.get("mobility_level", "Ambulatory")
+    date = logistics_data.get("departure_date")
+    adults = logistics_data.get("adults", 1)
+    max_offers = logistics_data.get("max_offers", 3)
     
     # If they need a stretcher, commercial flights from Amadeus aren't sufficient.
     if mobility == "Stretcher":
+        email_body = (
+            f"Dear Air Ambulance Provider,\n\n"
+            f"We are requesting a quote for a private medical charter for a patient requiring a stretcher.\n\n"
+            f"Origin: {origin_country}\n"
+            f"Mobility Level: Stretcher\n"
+            f"Companions: {adults - 1}\n\n"
+            f"Please provide an estimated quote and availability.\n\n"
+            f"Thank you."
+        )
+        
         return {
             "recommendation": "Air Ambulance Required",
             "options": [
                 {
-                    "provider": "Asia Air Ambulance",
-                    "price": "Estimated USD 5,000 - 10,000",
-                    "type": "Private Medical Charter"
+                    "provider": "Air Ambulance Operator",
+                    "price": "Contact for Quote",
+                    "type": "Private Medical Charter",
+                    "email_draft": {
+                        "to": "",
+                        "subject": f"Medical Charter Request - Stretcher Patient from {origin_country}",
+                        "body": email_body
+                    }
                 }
             ],
-            "notes": "Patient requires stretcher. Standard commercial flights are not applicable."
+            "notes": "Patient requires stretcher. Standard commercial flights from Amadeus are not applicable. Please use the provided email draft to request quotes from specialized medical flight operators."
         }
         
-    flights = find_flights(origin_country)
+    flights = find_flights(
+        origin_country=origin_country,
+        date=date,
+        adults=adults,
+        max_offers=max_offers
+    )
     
     return {
         "recommendation": f"Commercial Flight suitable for {mobility} passengers",

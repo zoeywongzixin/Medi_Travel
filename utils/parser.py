@@ -23,9 +23,11 @@ def get_concise_json(english_text):
         "Analyze the text and return ONLY a flat JSON object.\n"
         "Rules for keys:\n"
         "1. 'condition': The specific disease or symptom (e.g. Lung Cancer, Heart Failure).\n"
-        "2. 'sub_specialty_inference': The department needed. Choose from: Oncology, Cardiology, Orthopedics, Pediatrics, or General.\n"
+        "2. 'sub_specialty_inference': The most relevant department or sub-specialty. "
+        "Use precise labels when possible, such as Medical Oncology, Radiation Oncology, Thoracic Surgery, "
+        "Pulmonology, Cardiology, Cardiothoracic Surgery, Orthopedics, Pediatrics, or General Medicine.\n"
         "3. 'severity': Low, Moderate, High, or Critical.\n"
-        "4. 'is_cardio_oncology': Set to true if the text mentions cancer, tumors, or heart issues.\n"
+        "4. 'is_cardio_oncology': Set to true only if the text clearly mentions both cancer or tumor disease and a meaningful heart-related complication.\n"
         "5. If a value is missing, use 'Unknown'.\n"
         "Return ONLY the JSON."
     )

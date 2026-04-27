@@ -26,6 +26,11 @@ CHROMA_DB_PATH = str(ROOT_DIR / "data" / "chroma_db")
 
 _client: Optional[chromadb.PersistentClient] = None
 _collection: Optional[chromadb.Collection] = None
+SUPPORTED_CHARITY_AREAS = ("cardiology", "oncology")
+CONDITION_KEYWORDS = {
+    "cardiology": ("heart", "cardio", "cardiac", "cardiovascular", "coronary", "jantung"),
+    "oncology": ("cancer", "oncology", "tumor", "tumour", "chemotherapy", "radiotherapy", "kanser"),
+}
 
 
 # ---------------------------------------------------------------------------
@@ -64,42 +69,24 @@ def match_charities(medical_data: Dict, origin_country: str, top_n: int = 3) -> 
     Returns:
         List of matched fund dicts, country-specific ranked first.
     """
-    collection = _get_collection()
-    if collection is None or collection.count() == 0:
-        return []
-
     condition = medical_data.get("condition", "general medical")
-    return _two_stage_query(collection, condition, origin_country, top_n)
+    allowed_area = _condition_area_for_query(condition)
+    if allowed_area is None:
+        return []
+    funds = get_all_charities()
+    if not funds:
+        return []
+    return _rank_supported_funds(funds, condition, origin_country, top_n, allowed_area)
 
 
 def get_funds_for_country(country: str) -> List[Dict]:
     """Return all charities that explicitly target a specific country."""
-    collection = _get_collection()
-    if collection is None or collection.count() == 0:
-        return []
-
-    results = collection.query(
-        query_texts=[f"Medical financial assistance fund for {country} patients"],
-        n_results=min(20, collection.count()),
-    )
     funds = []
-    if results and results.get("ids"):
-        for i, cid in enumerate(results["ids"][0]):
-            meta = results["metadatas"][0][i] if results.get("metadatas") else {}
-            target_list = _parse_list(meta.get("target_countries", "[]"))
-            origin = (meta.get("origin_country") or "").lower()
-            if country.lower() in [t.lower() for t in target_list] or origin == country.lower():
-                funds.append({
-                    "id": cid,
-                    "name": meta.get("name", ""),
-                    "organization": meta.get("organization", ""),
-                    "source": meta.get("source", ""),
-                    "origin_country": meta.get("origin_country", ""),
-                    "target_countries": target_list,
-                    "conditions_covered": _parse_list(meta.get("conditions_covered", "[]")),
-                    "max_coverage_usd": int(meta.get("max_coverage_usd", 0)),
-                    "url": meta.get("url", ""),
-                })
+    for fund in get_all_charities():
+        target_list = fund.get("target_countries", [])
+        origin = (fund.get("origin_country") or "").lower()
+        if country.lower() in [t.lower() for t in target_list] or origin == country.lower():
+            funds.append(fund)
     return funds
 
 
@@ -112,7 +99,7 @@ def get_all_charities() -> List[Dict]:
     charities = []
     for i, cid in enumerate(results["ids"]):
         meta = results["metadatas"][i] if results.get("metadatas") else {}
-        charities.append({
+        charity = {
             "id": cid,
             "name": meta.get("name", ""),
             "organization": meta.get("organization", ""),
@@ -124,7 +111,9 @@ def get_all_charities() -> List[Dict]:
             "max_coverage_usd": int(meta.get("max_coverage_usd", 0)),
             "url": meta.get("url", ""),
             "active": meta.get("active", "True") == "True",
-        })
+        }
+        if _fund_supported(charity):
+            charities.append(charity)
     return charities
 
 
@@ -137,59 +126,25 @@ def collection_count() -> int:
 # Internal: two-stage RAG + priority ranking
 # ---------------------------------------------------------------------------
 
-def _two_stage_query(
-    collection: chromadb.Collection,
+def _rank_supported_funds(
+    funds: List[Dict],
     condition: str,
     origin_country: str,
     top_n: int,
+    allowed_area: str,
 ) -> List[Dict]:
-    n_results = min(top_n + 5, collection.count())
-
-    # Stage 1: country-specific query
-    r1 = collection.query(
-        query_texts=[f"Fund for {origin_country} patients with {condition}"],
-        n_results=n_results,
-    )
-    # Stage 2: regional / theme query
-    r2 = collection.query(
-        query_texts=[f"ASEAN medical financial aid {condition} treatment"],
-        n_results=n_results,
-    )
-
-    seen: set = set()
-    candidates: List[Dict] = []
-    for results in (r1, r2):
-        if not results or not results.get("ids"):
-            continue
-        for i, cid in enumerate(results["ids"][0]):
-            if cid in seen:
-                continue
-            seen.add(cid)
-            meta = results["metadatas"][0][i] if results.get("metadatas") else {}
-            candidates.append({
-                "id": cid,
-                "name": meta.get("name", "Unknown Fund"),
-                "organization": meta.get("organization", ""),
-                "source": meta.get("source", ""),
-                "origin_country": meta.get("origin_country", ""),
-                "target_countries": _parse_list(meta.get("target_countries", "[]")),
-                "target_audience": _parse_list(meta.get("target_audience", "[]")),
-                "conditions_covered": _parse_list(meta.get("conditions_covered", "[]")),
-                "max_coverage_usd": int(meta.get("max_coverage_usd", 0)),
-                "url": meta.get("url", ""),
-            })
-
-    candidates.sort(key=lambda c: _priority(c, origin_country, condition), reverse=True)
+    candidates = [fund for fund in funds if _fund_matches_area(fund, allowed_area)]
+    candidates.sort(key=lambda c: _priority(c, origin_country, condition, allowed_area), reverse=True)
     return candidates[:top_n]
 
 
-def _priority(c: Dict, origin_country: str, condition: str) -> int:
+def _priority(c: Dict, origin_country: str, condition: str, allowed_area: str) -> int:
     score = 0
     country_lc = origin_country.lower()
     origin_lc = (c.get("origin_country") or "").lower()
     target_lc = [t.lower() for t in c.get("target_countries", [])]
     audience_lc = [t.lower() for t in c.get("target_audience", [])]
-    cond_lc = [t.lower() for t in c.get("conditions_covered", [])]
+    cond_lc = _normalized_condition_areas(c.get("conditions_covered", []))
     cond_query_lc = condition.lower()
 
     if origin_lc == country_lc:
@@ -200,8 +155,10 @@ def _priority(c: Dict, origin_country: str, condition: str) -> int:
         score += 10           # Broad ASEAN coverage
 
     # Condition relevance
-    if any(kw in cond_query_lc for kw in cond_lc) or any(cond_query_lc in t for t in cond_lc):
+    if allowed_area in cond_lc:
         score += 20
+    if any(keyword in cond_query_lc for keyword in CONDITION_KEYWORDS.get(allowed_area, ())):
+        score += 10
 
     return score
 
@@ -214,3 +171,32 @@ def _parse_list(value) -> List[str]:
         return parsed if isinstance(parsed, list) else []
     except Exception:
         return [value] if value else []
+
+
+def _condition_area_for_query(condition: str) -> Optional[str]:
+    text = (condition or "").lower()
+    matched = [area for area, keywords in CONDITION_KEYWORDS.items() if any(keyword in text for keyword in keywords)]
+    if not matched:
+        return None
+    if "oncology" in matched:
+        return "oncology"
+    if "cardiology" in matched:
+        return "cardiology"
+    return None
+
+
+def _normalized_condition_areas(conditions: List[str]) -> List[str]:
+    normalized: List[str] = []
+    for condition in conditions:
+        area = _condition_area_for_query(condition)
+        if area and area not in normalized:
+            normalized.append(area)
+    return normalized
+
+
+def _fund_matches_area(fund: Dict, allowed_area: str) -> bool:
+    return allowed_area in _normalized_condition_areas(fund.get("conditions_covered", []))
+
+
+def _fund_supported(fund: Dict) -> bool:
+    return any(area in SUPPORTED_CHARITY_AREAS for area in _normalized_condition_areas(fund.get("conditions_covered", [])))

@@ -19,4 +19,7 @@ def translate_medical_text(raw_text):
         options={'temperature': 0}
     )
     
+    # Handle both old (dict) and new (object) Ollama response formats
+    if hasattr(response, 'message'):
+        return response.message.content
     return response['message']['content']

@@ -307,23 +307,16 @@ def fetch_iati() -> List[Dict]:
 # ---------------------------------------------------------------------------
 
 CONDITION_MAP: Dict[str, List[str]] = {
-    "Cardiology": ["heart", "cardiac", "cardio", "cardiovascular", "cardiothoracic"],
-    "Oncology": ["cancer", "oncol", "tumor", "tumour", "chemotherapy", "radiotherapy"],
-    "Orthopaedic": ["orthop", "bone", "joint", "spine", "fracture"],
-    "Neurology": ["brain", "neuro", "stroke", "epilepsy"],
-    "Respiratory": ["lung", "respir", "pulmon", "asthma", "tuberculosis"],
-    "Paediatric": ["child", "paediatric", "pediatric", "infant", "newborn"],
-    "General Surgery": ["surgery", "surgical", "operation", "procedure"],
-    "Gynaecology": ["maternal", "gynae", "gynaecol", "obstetric", "reproductive"],
-    "Trauma": ["trauma", "accident", "emergency", "injury"],
-    "Ophthalmology": ["eye", "vision", "cataract", "blind"],
+    "cardiology": ["heart", "cardiac", "cardio", "cardiovascular", "cardiothoracic"],
+    "oncology": ["cancer", "oncol", "tumor", "tumour", "chemotherapy", "radiotherapy"],
 }
+SUPPORTED_CHARITY_CONDITIONS = {"cardiology", "oncology"}
 
 
 def _infer_conditions(text: str) -> List[str]:
     t = text.lower()
     matched = [c for c, kws in CONDITION_MAP.items() if any(kw in t for kw in kws)]
-    return matched or ["General Medical"]
+    return [condition for condition in matched if condition in SUPPORTED_CHARITY_CONDITIONS]
 
 
 def _safe_int(val) -> int:
@@ -374,6 +367,11 @@ def _build_document(c: Dict) -> str:
 
 
 def ingest_to_chroma(charities: List[Dict]) -> None:
+    charities = [
+        charity
+        for charity in charities
+        if any(condition in SUPPORTED_CHARITY_CONDITIONS for condition in charity.get("conditions_covered", []))
+    ]
     print(f"\n[ChromaDB] Ingesting {len(charities)} charities into persistent RAG...")
     os.makedirs(CHROMA_DB_PATH, exist_ok=True)
     client = chromadb.PersistentClient(path=CHROMA_DB_PATH)

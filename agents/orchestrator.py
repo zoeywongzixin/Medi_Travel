@@ -37,7 +37,9 @@ def orchestrate_packages(medical_data: Dict, logistics_data: Dict, origin_countr
         
         try:
             import os
-            ollama_host = os.getenv("OLLAMA_HOST", "http://host.docker.internal:11434")
+            # Default to localhost if OLLAMA_HOST is not set, 
+            # as most local Windows users run Ollama locally.
+            ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
             client = ollama.Client(host=ollama_host)
             response = client.chat(
                 model='llama3.2:3b',

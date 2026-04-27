@@ -1,21 +1,45 @@
 import os
 from typing import Dict, List
-from serpapi import GoogleSearch
+import serpapi
 from dotenv import load_dotenv
 
 load_dotenv()
 
 SERPAPI_KEY = os.getenv("SERPAPI_KEY")
+DISABLE_LIVE_FLIGHTS_ENV = "DISABLE_LIVE_FLIGHTS"
+
+
+def live_flight_search_enabled() -> bool:
+    return os.getenv(DISABLE_LIVE_FLIGHTS_ENV, "").lower() not in ("1", "true", "yes")
 
 def get_serpapi_search(params):
+    if not live_flight_search_enabled():
+        return None
     if not SERPAPI_KEY:
         return None
     try:
-        params["api_key"] = SERPAPI_KEY
-        return GoogleSearch(params)
+        client = serpapi.Client(api_key=SERPAPI_KEY)
+        return client.search(params)
     except Exception as e:
         print(f"SerpApi Error: {e}")
         return None
+
+def search_google(query: str):
+    """General Google Search via SerpApi to find specialized logistics."""
+    params = {
+        "engine": "google",
+        "q": query,
+        "location": "Malaysia",
+        "hl": "en",
+        "gl": "my",
+        "num": 3
+    }
+    results = get_serpapi_search(params)
+    if not results:
+        return []
+    
+    organic = results.get("organic_results", [])
+    return [{"title": r.get("title"), "link": r.get("link"), "snippet": r.get("snippet")} for r in organic]
 
 def find_flights(origin_country: str, destination_airport: str = "KUL", date: str = None, adults: int = 1, max_offers: int = 3) -> List[Dict]:
     """
@@ -58,7 +82,8 @@ def find_flights(origin_country: str, destination_airport: str = "KUL", date: st
     
     if search:
         try:
-            response = search.get_dict()
+            # Official client.search() returns a dict-like object (SerpResults)
+            response = search
             
             best_flights = response.get("best_flights", [])
             other_flights = response.get("other_flights", [])
@@ -97,7 +122,7 @@ def find_flights(origin_country: str, destination_airport: str = "KUL", date: st
             pass
             
     # Mock fallback
-    print("⚠️ Using mock flight data (SerpApi not configured or failed)")
+    print("Using mock flight data (live flight search disabled, unavailable, or failed)")
     return [
         {
             "airline": "AirAsia (Mock)",
@@ -120,8 +145,11 @@ def get_flight_options(logistics_data: Dict, origin_country: str) -> Dict:
     adults = logistics_data.get("adults", 1)
     max_offers = logistics_data.get("max_offers", 3)
     
-    # If they need a stretcher, commercial flights from Amadeus aren't sufficient.
+    # If they need a stretcher, standard commercial flights are not sufficient.
     if mobility == "Stretcher":
+        query = f"Air Ambulance medical charter {origin_country} to Malaysia"
+        charter_providers = search_google(query)
+        
         email_body = (
             f"Dear Air Ambulance Provider,\n\n"
             f"We are requesting a quote for a private medical charter for a patient requiring a stretcher.\n\n"
@@ -132,21 +160,32 @@ def get_flight_options(logistics_data: Dict, origin_country: str) -> Dict:
             f"Thank you."
         )
         
-        return {
-            "recommendation": "Air Ambulance Required",
-            "options": [
-                {
-                    "provider": "Air Ambulance Operator",
+        options = []
+        if charter_providers:
+            for p in charter_providers:
+                options.append({
+                    "provider": p['title'],
+                    "link": p['link'],
                     "price": "Contact for Quote",
                     "type": "Private Medical Charter",
-                    "email_draft": {
-                        "to": "",
-                        "subject": f"Medical Charter Request - Stretcher Patient from {origin_country}",
-                        "body": email_body
-                    }
+                    "snippet": p['snippet']
+                })
+        else:
+            options.append({
+                "provider": "Air Ambulance Operator",
+                "price": "Contact for Quote",
+                "type": "Private Medical Charter",
+                "email_draft": {
+                    "to": "",
+                    "subject": f"Medical Charter Request - Stretcher Patient from {origin_country}",
+                    "body": email_body
                 }
-            ],
-            "notes": "Patient requires stretcher. Standard commercial flights from Amadeus are not applicable. Please use the provided email draft to request quotes from specialized medical flight operators."
+            })
+
+        return {
+            "recommendation": "Air Ambulance Required",
+            "options": options,
+            "notes": "Patient requires stretcher. Standard commercial flights are not applicable. We have found several specialized medical flight operators for you."
         }
         
     flights = find_flights(
@@ -155,9 +194,16 @@ def get_flight_options(logistics_data: Dict, origin_country: str) -> Dict:
         adults=adults,
         max_offers=max_offers
     )
-    
+
+    # For Wheelchair, we also search for specialized ground logistics in Malaysia
+    ground_logistics = []
+    if mobility == "Wheelchair":
+        ground_query = "Wheelchair accessible van rental airport transfer Kuala Lumpur"
+        ground_logistics = search_google(ground_query)
+
     return {
         "recommendation": f"Commercial Flight suitable for {mobility} passengers",
         "options": flights,
+        "ground_transport": ground_logistics,
         "notes": "Wheelchair assistance can be requested at the airport." if mobility == "Wheelchair" else "Standard travel."
     }

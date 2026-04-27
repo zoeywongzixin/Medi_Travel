@@ -47,7 +47,11 @@ def get_concise_json(english_text):
             options={'temperature': 0}
         )
         
-        content = response['message']['content'].strip()
+        # Handle both old (dict) and new (object) Ollama response formats
+        if hasattr(response, 'message'):
+            content = response.message.content.strip()
+        else:
+            content = response['message']['content'].strip()
         
         # --- FIX: REGEX EXTRACTION ---
         json_match = re.search(r'\{.*\}', content, re.DOTALL)

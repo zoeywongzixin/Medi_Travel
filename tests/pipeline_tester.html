@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pipeline Tester | Medical Matching</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --primary: #8b5cf6;
+            --text: #f8fafc;
+            --muted: #94a3b8;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+        h1 { font-family: 'Outfit', sans-serif; font-weight: 800; color: var(--primary); }
+        .card {
+            background: var(--card);
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-weight: 500; font-size: 0.9rem; color: var(--muted); }
+        input[type="text"], input[type="number"], input[type="file"] {
+            width: 100%;
+            padding: 12px;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            color: white;
+            outline: none;
+        }
+        button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 14px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        button:hover { opacity: 0.9; }
+        #result {
+            margin-top: 30px;
+            padding: 20px;
+            background: #020617;
+            border-radius: 8px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 0.85rem;
+            color: #10b981;
+            border: 1px solid #1e293b;
+            display: none;
+        }
+        .loading { display: none; margin-top: 20px; color: var(--primary); font-weight: 600; }
+    </style>
+</head>
+<body>
+    <h1>🩺 Pipeline Tester</h1>
+    <p style="color: var(--muted); margin-bottom: 30px;">Upload a medical report to test the end-to-end multi-agent matching flow.</p>
+
+    <div class="card">
+        <form id="testerForm">
+            <div class="form-group">
+                <label>Medical Report (Image or PDF)</label>
+                <input type="file" id="reportFile" required>
+            </div>
+            <div class="form-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div>
+                    <label>Origin Country</label>
+                    <input type="text" id="origin" value="Vietnam">
+                </div>
+                <div>
+                    <label>Budget (USD)</label>
+                    <input type="number" id="budget" value="5000">
+                </div>
+            </div>
+            <button type="submit" id="submitBtn">Run Pipeline Match</button>
+        </form>
+        
+        <div class="loading" id="loading">Processing... (this may take 10-30 seconds)</div>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        document.getElementById('testerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const fileInput = document.getElementById('reportFile');
+            const origin = document.getElementById('origin').value;
+            const budget = document.getElementById('budget').value;
+            const resultDiv = document.getElementById('result');
+            const loading = document.getElementById('loading');
+            const btn = document.getElementById('submitBtn');
+
+            if (!fileInput.files[0]) return;
+
+            loading.style.display = 'block';
+            resultDiv.style.display = 'none';
+            btn.disabled = true;
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            formData.append('origin_country', origin);
+            formData.append('budget_usd', budget);
+
+            try {
+                const response = await fetch('http://localhost:8000/api/v1/full-pipeline', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                resultDiv.textContent = JSON.stringify(data, null, 2);
+                resultDiv.style.display = 'block';
+            } catch (err) {
+                resultDiv.textContent = 'Error: ' + err.message;
+                resultDiv.style.display = 'block';
+            } finally {
+                loading.style.display = 'none';
+                btn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>

@@ -3,6 +3,8 @@ import re
 import os
 import asyncio
 
+os.environ.setdefault("DISABLE_LIVE_FLIGHTS", "1")
+
 # 🔹 Existing pipeline
 from utils.ocr_engine import extract_raw_text
 from utils.translator import translate_medical_text
@@ -54,7 +56,7 @@ def run_full_pipeline(file_path, country="Thailand"):
     }
 
     # 🧠 STEP 5: CORE TRANSPORT DECISION ENGINE (Amadeus API)
-    print("\n--- 5. Generating Flight/Transport Recommendation (via Amadeus) ---")
+    print("\n--- 5. Generating Flight/Transport Recommendation ---")
     transport_plan = get_flight_options(logistics_data, country)
 
     final_output["transport_recommendation"] = transport_plan
@@ -70,12 +72,15 @@ def run_full_pipeline(file_path, country="Thailand"):
 
 # 🧪 TEST RUN
 if __name__ == "__main__":
-    path = r"C:\Users\User\Downloads\Safra-oncology-report-page-1.b197b0.pdf"
+    path = os.getenv(
+        "TEST_PIPELINE_FILE",
+        os.path.join(os.path.dirname(__file__), "vietnamese_report.jpg")
+    )
 
     if not os.path.exists(path):
         print(f"❌ ERROR: File not found at {path}")
     else:
-        result = run_full_pipeline(path, country="Thailand")
+        result = run_full_pipeline(path, country="Vietnam")
 
         print("\n" + "="*50)
         print("🎯 FINAL CONSOLIDATED OUTPUT")

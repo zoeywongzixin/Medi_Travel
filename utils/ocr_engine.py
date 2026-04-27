@@ -21,14 +21,14 @@ elif os.name == 'posix':
     # In Linux/Docker, tesseract is usually in the PATH
     pytesseract.pytesseract.tesseract_cmd = 'tesseract'
 else:
-    print("⚠️ WARNING: TESSERACT_PATH not valid or missing. OCR might fail on Windows.")
+    print("WARNING: TESSERACT_PATH not valid or missing. OCR might fail on Windows.")
 
 # Apply Poppler configuration
 # On Linux, poppler is in the PATH, so we set POPPLER_BIN to None for convert_from_path
 if not POPPLER_BIN or not os.path.exists(POPPLER_BIN):
     POPPLER_BIN = None
     if os.name != 'posix':
-        print("⚠️ WARNING: Poppler path invalid. PDF OCR might fail on Windows.")
+        print("WARNING: Poppler path invalid. PDF OCR might fail on Windows.")
 
 
 # --- HELPER FUNCTIONS ---
@@ -36,15 +36,17 @@ if not POPPLER_BIN or not os.path.exists(POPPLER_BIN):
 def preprocess_image_data(cv_img):
     """
     Cleans and prepares image data for OCR.
-    Uses adaptive thresholding to handle uneven lighting in photos (snaps).
+    Upscales for better character recognition and handles grayscale.
     """
-    # Convert to grayscale
+    # 1. Convert to grayscale
     gray = cv2.cvtColor(cv_img, cv2.COLOR_BGR2GRAY)
     
-    # Apply Adaptive Thresholding
-    # Removing aggressive adaptive thresholding as it corrupts text for Tesseract 4+
-    # Instead, use a mild blur to remove noise while keeping grayscale text intact
-    gray = cv2.medianBlur(gray, 3)
+    # 2. Upscale (Resizing by 2x helps Tesseract with small fonts)
+    height, width = gray.shape[:2]
+    gray = cv2.resize(gray, (width * 2, height * 2), interpolation=cv2.INTER_CUBIC)
+    
+    # 3. Use simple thresholding to sharpen text
+    _, gray = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     
     return Image.fromarray(gray)
 

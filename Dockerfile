@@ -1,24 +1,38 @@
-FROM python:3.10-slim
+# Use Python 3.11 Slim as base
+FROM python:3.11-slim
 
-# Install system dependencies (Tesseract, Poppler, and OpenCV requirements)
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install system dependencies (Tesseract, Poppler)
 RUN apt-get update && apt-get install -y \
     tesseract-ocr \
     poppler-utils \
-    libgl1 \
     libglib2.0-0 \
+    build-essential \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+# Set working directory
 WORKDIR /app
 
-# Copy requirements and install
+# Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application
+# Copy the application code
 COPY . .
 
-# Expose FastAPI port
+# Create persistent data directories
+RUN mkdir -p /app/data/chroma_db /app/reports
+
+# Make startup script executable
+RUN chmod +x /app/start.sh
+
+# Expose the FastAPI port
 EXPOSE 8000
 
-# Run the API
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Use startup script so collections are always ready
+CMD ["/bin/bash", "/app/start.sh"]

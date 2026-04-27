@@ -10,29 +10,26 @@ from pathlib import Path
 env_path = Path(__file__).resolve().parent.parent / '.env'
 load_dotenv(dotenv_path=env_path)
 
-# Fetch paths and CLEAN them (removes quotes and accidental spaces)
+# Fetch paths and CLEAN them
 TESSERACT_PATH = os.getenv('TESSERACT_PATH', '').strip().replace('"', '')
 POPPLER_BIN = os.getenv('POPPLER_PATH', '').strip().replace('"', '')
 
-if not POPPLER_BIN:
-    POPPLER_BIN = None
-
 # Apply Tesseract configuration
-if TESSERACT_PATH:
+if TESSERACT_PATH and os.path.exists(TESSERACT_PATH):
     pytesseract.pytesseract.tesseract_cmd = TESSERACT_PATH
+elif os.name == 'posix':
+    # In Linux/Docker, tesseract is usually in the PATH
+    pytesseract.pytesseract.tesseract_cmd = 'tesseract'
 else:
-    print("❌ ERROR: TESSERACT_PATH missing from .env")
+    print("⚠️ WARNING: TESSERACT_PATH not valid or missing. OCR might fail on Windows.")
 
-# --- PATH VALIDATION (Debugging) ---
-# This will alert you immediately if the folder doesn't exist
-if POPPLER_BIN and not os.path.exists(POPPLER_BIN):
-    print(f"❌ ERROR: Poppler path is incorrect: {POPPLER_BIN}")
+# Apply Poppler configuration
+# On Linux, poppler is in the PATH, so we set POPPLER_BIN to None for convert_from_path
+if not POPPLER_BIN or not os.path.exists(POPPLER_BIN):
+    POPPLER_BIN = None
+    if os.name != 'posix':
+        print("⚠️ WARNING: Poppler path invalid. PDF OCR might fail on Windows.")
 
-# Configure Tesseract path
-if TESSERACT_PATH:
-    pytesseract.pytesseract.tesseract_cmd = TESSERACT_PATH.strip()
-else:
-    print("❌ ERROR: TESSERACT_PATH not found in .env file.")
 
 # --- HELPER FUNCTIONS ---
 

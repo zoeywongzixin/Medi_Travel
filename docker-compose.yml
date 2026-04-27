@@ -4,26 +4,26 @@ services:
   ollama:
     image: ollama/ollama:latest
     container_name: ollama
-    ports:
-      - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    # This automatically pulls the model when the container starts
+    entrypoint: /bin/sh
+    command: -c "ollama serve & sleep 5 && ollama pull llama3.2:3b && wait"
 
-  api:
+  backend:
     build: .
-    container_name: medical_api
+    container_name: medical-match-backend
     ports:
       - "8000:8000"
-    volumes:
-      - .:/app
-    environment:
-      # Point to the ollama container instead of the host
-      - OLLAMA_HOST=http://ollama:11434
-      - TESSERACT_PATH=tesseract
-      - POPPLER_PATH=
-      - ANONYMIZED_TELEMETRY=False
     env_file:
       - .env
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    volumes:
+      - ./data:/app/data
+      - ./reports:/app/reports
     depends_on:
       - ollama
 

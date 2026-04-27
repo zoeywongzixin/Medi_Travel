@@ -36,14 +36,21 @@ def orchestrate_packages(medical_data: Dict, logistics_data: Dict, origin_countr
         )
         
         try:
-            response = ollama.chat(
+            import os
+            ollama_host = os.getenv("OLLAMA_HOST", "http://host.docker.internal:11434")
+            client = ollama.Client(host=ollama_host)
+            response = client.chat(
                 model='llama3.2:3b',
                 messages=[{'role': 'user', 'content': prompt}],
                 options={'temperature': 0.2, 'num_ctx': 800}
             )
-            package_reasoning = response['message']['content'].strip()
-        except Exception:
+            # ollama 0.4.x returns an object with attribute access
+            package_reasoning = response.message.content.strip()
+        except Exception as e:
+            print(f"Ollama Error: {e}")
             package_reasoning = "This package combines top medical care, suitable logistics, and available financial aid."
+
+
             
         package = {
             "package_id": f"PKG_{i+1}",

@@ -42,6 +42,8 @@ def _get_collection() -> Optional[chromadb.Collection]:
     if _collection is not None:
         return _collection
     try:
+        import os
+        os.environ["CHROMA_ANONYMIZED_TELEMETRY"] = "False"
         _client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
         emb_fn = embedding_functions.DefaultEmbeddingFunction()
         _collection = _client.get_collection(name="charities", embedding_function=emb_fn)
@@ -58,11 +60,15 @@ def _get_collection() -> Optional[chromadb.Collection]:
 
 def match_charities(medical_data: Dict, origin_country: str, top_n: int = 3) -> List[Dict]:
     """
-    Match patient profile to charity funds using two-stage Vector RAG
-    with country-priority post-ranking.
+    Match patient profile to charity funds using a two-stage pipeline:
+      Stage 1: Semantic vector query against ChromaDB charities collection
+               → narrows to the most contextually relevant funds.
+      Stage 2: Metadata priority ranking with severity/urgency enrichment
+               → country-specific and well-funded results ranked first.
 
     Args:
-        medical_data:   dict with at least {'condition': str}
+        medical_data:   dict with at least {'condition': str}.
+                        May also contain 'severity', 'urgency' for enriched ranking.
         origin_country: patient's home country e.g. 'Laos', 'Vietnam'
         top_n:          max results to return
 
@@ -73,10 +79,38 @@ def match_charities(medical_data: Dict, origin_country: str, top_n: int = 3) -> 
     allowed_area = _condition_area_for_query(condition)
     if allowed_area is None:
         return []
+
+    # ---------------------------------------------------------------------------
+    # Stage 1: Semantic pre-query — actually use the vector DB
+    # ---------------------------------------------------------------------------
+    collection = _get_collection()
+    semantic_ids: set = set()
+    if collection is not None and collection.count() > 0:
+        severity = medical_data.get("severity", "")
+        urgency = medical_data.get("urgency", "")
+        query_text = (
+            f"Financial aid fund for {condition} patients from {origin_country}. "
+            f"Severity: {severity}. Urgency: {urgency}. "
+            f"Medical area: {allowed_area}. ASEAN medical tourism support."
+        )
+        try:
+            n_query = min(15, collection.count())
+            sem_results = collection.query(query_texts=[query_text], n_results=n_query)
+            if sem_results and sem_results.get("ids"):
+                semantic_ids = set(sem_results["ids"][0])
+        except Exception as exc:
+            print(f"[CharityAgent] Semantic query failed, falling back to full scan: {exc}")
+
+    # ---------------------------------------------------------------------------
+    # Stage 2: Metadata priority ranking
+    # ---------------------------------------------------------------------------
     funds = get_all_charities()
     if not funds:
         return []
-    return _rank_supported_funds(funds, condition, origin_country, top_n, allowed_area)
+
+    # Prefer semantically matched funds — boost their priority score
+    return _rank_supported_funds(funds, condition, origin_country, top_n, allowed_area,
+                                  semantic_ids=semantic_ids, medical_data=medical_data)
 
 
 def get_funds_for_country(country: str) -> List[Dict]:
@@ -132,13 +166,29 @@ def _rank_supported_funds(
     origin_country: str,
     top_n: int,
     allowed_area: str,
+    semantic_ids: set = None,
+    medical_data: Dict = None,
 ) -> List[Dict]:
     candidates = [fund for fund in funds if _fund_matches_area(fund, allowed_area)]
-    candidates.sort(key=lambda c: _priority(c, origin_country, condition, allowed_area), reverse=True)
+    candidates.sort(
+        key=lambda c: _priority(
+            c, origin_country, condition, allowed_area,
+            semantic_ids=semantic_ids or set(),
+            medical_data=medical_data or {},
+        ),
+        reverse=True,
+    )
     return candidates[:top_n]
 
 
-def _priority(c: Dict, origin_country: str, condition: str, allowed_area: str) -> int:
+def _priority(
+    c: Dict,
+    origin_country: str,
+    condition: str,
+    allowed_area: str,
+    semantic_ids: set = None,
+    medical_data: Dict = None,
+) -> int:
     score = 0
     country_lc = origin_country.lower()
     origin_lc = (c.get("origin_country") or "").lower()
@@ -147,6 +197,7 @@ def _priority(c: Dict, origin_country: str, condition: str, allowed_area: str) -
     cond_lc = _normalized_condition_areas(c.get("conditions_covered", []))
     cond_query_lc = condition.lower()
 
+    # --- Country priority ---
     if origin_lc == country_lc:
         score += 100          # Fund originated from patient's own country
     if country_lc in target_lc:
@@ -154,11 +205,35 @@ def _priority(c: Dict, origin_country: str, condition: str, allowed_area: str) -
     if "asean" in audience_lc:
         score += 10           # Broad ASEAN coverage
 
-    # Condition relevance
+    # --- Condition relevance ---
     if allowed_area in cond_lc:
         score += 20
     if any(keyword in cond_query_lc for keyword in CONDITION_KEYWORDS.get(allowed_area, ())):
         score += 10
+
+    # --- Semantic match bonus ---
+    if semantic_ids and c.get("id") in semantic_ids:
+        score += 25           # ChromaDB ranked this fund as contextually relevant
+
+    # --- Metadata enrichment bonuses ---
+    md = medical_data or {}
+    severity = (md.get("severity") or "").strip().title()
+    urgency = (md.get("urgency") or "").strip().title()
+    max_coverage = c.get("max_coverage_usd", 0)
+
+    # Active funds with real coverage are worth more for urgent cases
+    if urgency in ("High", "Critical") and c.get("active"):
+        score += 20
+
+    # Critical patients need funds that actually have money
+    if severity == "Critical" and max_coverage == 0:
+        score -= 30           # Penalise zero-coverage funds for critical cases
+
+    # Reward funds whose coverage is meaningful (>= $500 USD)
+    if max_coverage >= 500:
+        score += 10
+    if max_coverage >= 2000:
+        score += 5            # Extra bump for well-funded grants
 
     return score
 

@@ -18,8 +18,11 @@ def get_serpapi_search(params):
     if not SERPAPI_KEY:
         return None
     try:
-        client = serpapi.Client(api_key=SERPAPI_KEY)
-        return client.search(params)
+        # Use the standard GoogleSearch class from the serpapi library
+        from serpapi import GoogleSearch
+        params["api_key"] = SERPAPI_KEY
+        search = GoogleSearch(params)
+        return search.get_dict()
     except Exception as e:
         print(f"SerpApi Error: {e}")
         return None

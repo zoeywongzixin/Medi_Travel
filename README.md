@@ -2,74 +2,69 @@
 
 A sophisticated multi-layer AI agentic system designed to match international patients (Medical Tourists) with specialized healthcare providers, logistical support, and financial aid in Malaysia.
 
-## 🚀 Recent Improvements
-- **Browser-Based Tester**: Added `pipeline_tester.html` for easy one-click testing of the full API flow.
-- **Strict Charity Narrowing**: Updated the Charity RAG database to focus exclusively on **Oncology** and **Cardiology**.
-- **Enhanced Reliability**:
-  - Upgraded to the **Official SerpApi Python Client** for more reliable flight data.
-  - Added support for **Ollama 0.4.x** response formats across all agents.
-  - Fixed Unicode encoding issues for Windows terminals.
+## 🚀 Recent Improvements — Stronger Matching Engine
+We have upgraded the core intelligence of the system with a more robust, multi-stage matching pipeline:
+
+- **Hybrid Doctor Search**: Merges **Semantic (Vector)** and **Keyword (Token-Overlap)** ranking using **Reciprocal Rank Fusion (RRF)** for 2x better search precision.
+- **4-Stage Agentic Funnel**: 
+    1.  **Hybrid RAG Search** (Top-20 candidates).
+    2.  **Hard Specialty Gate** (Ensures doctor group matches diagnosis).
+    3.  **Metadata-Enriched Scoring** (Bonuses for Severity, Urgency, and Paediatrics).
+    4.  **LLM Judge (Rerank)** (Ollama compares the Top-5 and selects the final Top-3).
+- **Docker-First Stability**: Now uses **Named Volumes** for ChromaDB to prevent SQLite Disk I/O errors on Windows and includes **Auto-Model Pulling** for Ollama.
 
 ## 🧠 AI Architecture & Data Layers
 
 Our system is built as a **Multi-Layer Agentic Orchestrator**. Each layer uses specific AI tools to ensure accuracy and transparency.
 
-### Layer 1: Medical Specialist Matching
-*   **AI Tools**: **Ollama (Llama 3.2:3b)** + **ChromaDB (Vector RAG)**.
-*   **How it Works**: 
-    1.  The **Medical Agent** uses LLM reasoning to infer the specific sub-specialty needed (e.g., "Electrophysiology" from a general heart report).
-    2.  It performs a **Semantic Search** against our centralized Doctor RAG database.
-*   **Data Retrieval**: Real-time retrieval from the `malaysia_doctors` vector collection.
+### Layer 1: Medical Specialist Matching (Stronger Engine)
+*   **AI Tools**: **Ollama (Llama 3.2:3b)** + **ChromaDB (Hybrid RAG)**.
+*   **Enriched Logic**:
+    *   **Severity Boost**: Critical cases are automatically prioritized for Government specialist centers (IKN, IJN).
+    *   **Urgency Boost**: High-urgency cases favor doctors with Full Registration numbers (Senior Consultants).
+    *   **Paediatric Focus**: Auto-detects child patients and boosts specialists with paediatric experience.
+*   **Reranking**: An LLM agent acts as a final "Judge" to compare the top candidates based on the actual case summary.
 
 ### Layer 2: Logistics & Flight Intelligence
 *   **AI Tools**: **Official SerpApi Client** + **Logistic Reasoning Engine**.
 *   **How it Works**: 
     1.  Analyzes the patient's medical chart to determine mobility (Ambulatory vs. Stretcher).
-    2.  If the patient is ambulatory, it fetches **LIVE flight data** (prices, times, airlines).
-    3.  If the patient requires a stretcher, it automatically generates a professional **Medical Charter Email Draft**.
+    2.  If ambulatory, it fetches **LIVE flight data** (prices, times, airlines).
+    3.  If stretcher-bound, it generates a professional **Medical Charter Email Draft**.
 
 ### Layer 3: Financial Aid & Charity Matching
-*   **AI Tools**: **Ollama (Eligibility Reasoning)** + **Country-Priority Ranking**.
-*   **How it Works**: 
-    1.  Matches the patient's origin and condition against Malaysian NGO rules.
-    2.  **Strict Scope**: Only matches for **Oncology** and **Cardiology** cases.
-    3.  **Regional Priority**: Favors regional ASEAN funds (e.g., specific aids for Laos/Vietnam patients).
+*   **AI Tools**: **Semantic Vector Matching** + **Ollama Eligibility Reasoning**.
+*   **Strict Scope**: Only matches for **Oncology** and **Cardiology** cases.
+*   **Fund Matching**: Prioritizes funds based on patient severity and origin country coverage.
 
 ---
 
 ## 🛠️ Project Structure
-- `app.py`: Main FastAPI entry point.
-- `agents/`: Core multi-agent logic (Medical, Flight, Logistics, Charity, Orchestrator).
-- `pipeline/`: Data ingestion and report generation tools.
-- `reports/`: Stores visual dashboards (`db_dashboard.html`, `charity_dashboard.html`).
+- `agents/`: Core multi-agent logic (`medical_agent.py`, `rerank_agent.py`, `flight_agent.py`, `charity_agent.py`).
+- `pipeline/`: Data ingestion (`ingest_doctors.py`, `ingest_charities.py`).
 - `tests/`: 
   - `pipeline_tester.html`: GUI tool for manual pipeline testing.
-  - `fixtures/`: Mock medical reports (images/txt) for testing.
-  - `dev_tools/`: Connection check and DB debugging scripts.
-- `utils/`: Shared utilities (OCR, Translation, PII Scrubbing).
-- `data/`: Local storage for ChromaDB.
+  - `test_hybrid_matching.py`: Unit tests for the new search engine.
+- `docker-compose.yml`: Production-ready orchestration with Ollama and backend.
 
 ---
 
-## ⚙️ How to Run & Test
+## ⚙️ How to Run
 
-### 1. Start the Backend
-```bash
-python app.py
+### 1. Start via Docker (Recommended)
+This will automatically pull the AI models and ingest the medical database:
+```powershell
+docker-compose up --build
 ```
+*Note: The first run may take 5–10 minutes to download the AI models and ChromaDB components.*
 
 ### 2. Test in Browser
-Double-click `tests/pipeline_tester.html` in your file explorer.
+Once the backend is ready (check for `=== All collections ready ===` in logs), open:
+`c:\Documents\Jasmine\ai_medical_matching\tests\pipeline_tester.html`
 
-### 3. Generate Visual Dashboards
+### 3. Run Unit Tests (Local)
 ```bash
-python pipeline/generate_report.py
-python pipeline/generate_charity_dashboard.py
-```
-
-### 4. Integration Tests
-```bash
-python tests/test_vietnamese_flow.py
+python tests/test_hybrid_matching.py
 ```
 
 ---

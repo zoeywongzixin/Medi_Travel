@@ -77,6 +77,11 @@ def build_case_profile(medical_data: Dict) -> Dict:
     if "cardio" in combined or "heart" in combined or "jantung" in combined:
         groups.add("cardiology")
 
+    # Pull parser-extracted metadata so downstream scorers don't need to re-read medical_data
+    severity = (medical_data.get("severity") or "Unknown").strip().title()
+    urgency = (medical_data.get("urgency") or "Unknown").strip().title()
+    age_group = (medical_data.get("age_group") or "Unknown").strip().title()
+
     return {
         "condition": condition,
         "sub_specialty": sub_specialty,
@@ -86,4 +91,8 @@ def build_case_profile(medical_data: Dict) -> Dict:
         "groups": groups,
         "lung_focus": "lung" in combined or "pulmo" in combined or "thorac" in combined,
         "cardio_oncology": bool(medical_data.get("is_cardio_oncology")),
+        # Enriched metadata
+        "severity": severity,      # "Low" | "Moderate" | "High" | "Critical"
+        "urgency": urgency,        # "Low" | "Moderate" | "High" | "Unknown"
+        "age_group": age_group,    # e.g. "Paediatric" | "Adult" | "Geriatric"
     }

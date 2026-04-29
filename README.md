@@ -68,4 +68,13 @@ python tests/test_hybrid_matching.py
 ```
 
 ---
+
+## 🤖 AI Assistant Contribution
+This project was developed and refined in collaboration with **Antigravity**, an advanced agentic AI coding assistant designed by Google Deepmind. Key contributions include:
+- Refactoring the monolithic backend pipeline into an interactive, multi-step wizard.
+- Exposing independent API endpoints for the medical, logistics, and charity layers to enable step-by-step option selection.
+- Implementing a final package combination endpoint for personalized LLM reasoning.
+- Setting up and finalizing the Docker deployment configuration.
+
+---
 **Build for ASEAN AI Hackathon 2026**

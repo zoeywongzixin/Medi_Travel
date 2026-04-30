@@ -13,6 +13,74 @@ class MedicalRecord(BaseModel):
     is_cardio_oncology: bool = Field(default=False)
     raw_summary: Optional[str] = Field(default="")
 
+
+def infer_age_group(text: str) -> str:
+    if not text:
+        return "Unknown"
+
+    age_match = re.search(r"\bage\s*[:\-]?\s*(\d{1,3})\b", text, re.IGNORECASE)
+    if age_match:
+        age = int(age_match.group(1))
+        if age <= 1:
+            return "Infant"
+        if age < 18:
+            return "Child"
+        if age >= 60:
+            return "Senior"
+        return "Adult"
+
+    lowered = text.lower()
+    if any(term in lowered for term in ("infant", "neonate", "newborn")):
+        return "Infant"
+    if any(term in lowered for term in ("child", "children", "pediatric", "paediatric")):
+        return "Child"
+    if any(term in lowered for term in ("elderly", "geriatric", "senior")):
+        return "Senior"
+    return "Unknown"
+
+
+def infer_urgency(text: str, severity: str = "") -> str:
+    severity_normalized = (severity or "").strip().title()
+    if severity_normalized == "Critical":
+        return "Critical"
+    if severity_normalized == "High":
+        return "Urgent"
+
+    if not text:
+        return "Unknown"
+
+    lowered = text.lower()
+    critical_terms = (
+        "critical",
+        "life-threatening",
+        "life threatening",
+        "immediate life-saving",
+        "requires icu",
+        "requires ventilator",
+        "hemodynamic instability",
+    )
+    urgent_terms = (
+        "urgent",
+        "emergency",
+        "as soon as possible",
+        "requires transfer",
+        "needs transfer",
+        "refer to malaysia",
+        "chemotherapy",
+        "radiotherapy",
+        "hemoptysis",
+        "blood-streaked sputum",
+        "coughing blood",
+        "rapid weight loss",
+        "chest pain",
+    )
+
+    if any(term in lowered for term in critical_terms):
+        return "Critical"
+    if any(term in lowered for term in urgent_terms):
+        return "Urgent"
+    return "Stable"
+
 def get_concise_json(english_text):
     """Uses Llama 3.2 to structure the translated text into a valid JSON."""
     MODEL_NAME = 'llama3.2:3b' 
@@ -27,8 +95,10 @@ def get_concise_json(english_text):
         "Use precise labels when possible, such as Medical Oncology, Radiation Oncology, Thoracic Surgery, "
         "Pulmonology, Cardiology, Cardiothoracic Surgery, Orthopedics, Pediatrics, or General Medicine.\n"
         "3. 'severity': Low, Moderate, High, or Critical.\n"
-        "4. 'is_cardio_oncology': Set to true only if the text clearly mentions both cancer or tumor disease and a meaningful heart-related complication.\n"
-        "5. If a value is missing, use 'Unknown'.\n"
+        "4. 'age_group': Infant, Child, Adult, Senior, or Unknown.\n"
+        "5. 'urgency': Stable, Urgent, Critical, or Unknown.\n"
+        "6. 'is_cardio_oncology': Set to true only if the text clearly mentions both cancer or tumor disease and a meaningful heart-related complication.\n"
+        "7. If a value is missing, use 'Unknown'.\n"
         "Return ONLY the JSON."
     )
 
@@ -63,10 +133,22 @@ def get_concise_json(english_text):
         # 3. SELF-CORRECTION: Handle the Boolean bug
         val = temp_data.get("is_cardio_oncology")
         temp_data["is_cardio_oncology"] = str(val).lower() in ("true", "1", "yes")
+        temp_data["age_group"] = temp_data.get("age_group") or infer_age_group(english_text)
+        temp_data["urgency"] = temp_data.get("urgency") or infer_urgency(
+            english_text,
+            temp_data.get("severity", ""),
+        )
 
         # 4. Final Validation with Pydantic
         # Ensure MedicalRecord is imported/defined above this function
-        return MedicalRecord.model_validate(temp_data).model_dump()
+        validated = MedicalRecord.model_validate(temp_data).model_dump()
+
+        if validated.get("age_group") in ("Unknown", "", None):
+            validated["age_group"] = infer_age_group(english_text)
+        if validated.get("urgency") in ("Unknown", "", None):
+            validated["urgency"] = infer_urgency(english_text, validated.get("severity", ""))
+
+        return validated
 
     except Exception as e:
         print(f"\n--- ❌ PARSER ERROR LOG ---")

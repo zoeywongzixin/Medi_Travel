@@ -1,71 +1,145 @@
-# 🩺 ASEAN Medical AI Matching Backend
+# ASEAN Medical Match
 
-A sophisticated multi-layer AI agentic system designed to match international patients (Medical Tourists) with specialized healthcare providers, logistical support, and financial aid in Malaysia.
+ASEAN Medical Match is a multi-agent medical travel matching platform for patients seeking treatment in Malaysia. It combines clinical extraction, hospital matching, flight planning, charity matching, and visa-support document generation in one workflow.
 
-## 🚀 Latest Improvements — Precision & Regional Logic
-We have significantly upgraded the core intelligence of the system with more granular matching and a premium user interface:
+## What is new
 
-- **Enhanced Charity Intelligence**: Now supports specific ASEAN regional groupings like **CLMV** (Cambodia, Laos, Myanmar, Vietnam), **BIMP-EAGA**, and **IMES** for hyper-local financial aid matching.
-- **Clinical Reranking v2**: Our AI judge (Ollama) now performs **Sub-Specialty Alignment**, matching granular doctor tags against diagnosis and prioritizing **Tier 1 Hospitals** for critical cases.
-- **Age-Aware Orchestration**: Automated detection and logic for Infant, Child, Adult, and Senior patient categories across the entire agentic pipeline.
-- **Premium Pipeline Tester**: A completely redesigned, interactive GUI with glassmorphism aesthetics and step-by-step clinical verification.
-- **Hybrid Doctor Search**: Merges **Semantic (Vector)** and **Keyword (Token-Overlap)** ranking using **Reciprocal Rank Fusion (RRF)** for high search precision.
+- Country-first onboarding with ASEAN flag selection
+- Simpler UI focused on one guided patient flow
+- Localized interface based on the selected country
+- Translated recommendation text and translated PDF support letters
+- Structured MHTC / Borang IM.47 visa support letters with placeholder-only PII
+- Clinical extraction that now explicitly tracks age group and urgency
 
-## 🧠 AI Architecture & Data Layers
+## User flow
 
-Our system is built as a **Multi-Layer Agentic Orchestrator**. Each layer uses specific AI tools to ensure accuracy and transparency.
+1. Open the app at `/tester`
+2. Choose an ASEAN country from the flag list
+3. The app switches to that country's language for the UI
+4. Upload a medical report image or PDF
+5. Review extracted clinical fields:
+   - Age Group
+   - Diagnosis
+   - Urgency Status
+6. Select one hospital, one flight, and one charity
+7. Generate the final itinerary and download support letters
 
-### Layer 1: Medical Specialist Matching (Precision Engine)
-*   **AI Tools**: **Ollama (Llama 3.2:3b)** + **ChromaDB (Hybrid RAG)**.
-*   **Enriched Logic**:
-    *   **Sub-Specialty Alignment**: Matches doctor "specialty tags" (e.g., *Robotic Urology*) directly against patient diagnosis.
-    *   **Hospital Tiers**: Critical cases are prioritized for Tier 1 specialized centers (advanced technology & higher care).
-    *   **Age-Group Context**: Reranking logic adjusts based on the patient's age (Paediatric vs. Geriatric expertise).
-    *   **Urgency Boost**: High-urgency cases favor senior consultants with Full Registration status.
+## Current letter behavior
 
-### Layer 2: Logistics & Flight Intelligence
-*   **AI Tools**: **Official SerpApi Client** + **Logistic Reasoning Engine**.
-*   **How it Works**: 
-    1.  Analyzes the patient's medical chart to determine mobility (Ambulatory vs. Stretcher).
-    2.  Fetches **LIVE flight data** or generates a **Medical Charter Email Draft** based on transport needs.
+The visa-support flow is deterministic and formatted for `fpdf2` `multi_cell(...)` usage.
 
-### Layer 3: Financial Aid & Charity Matching (Regional RAG)
-*   **AI Tools**: **Semantic Vector Matching** + **ASEAN Regional Logic**.
-*   **Regional Groupings**: Explicit logic for **CLMV**, **BIMP-EAGA**, and **IMES** groupings to prioritize funds originating from or targeting the patient's sub-region.
-*   **Strict Scope**: Focused on **Oncology** and **Cardiology** high-cost surgical cases.
+- The letter includes:
+  - clinical extraction summary
+  - selected hospital
+  - selected flight
+  - selected charity
+  - MHTC and Borang IM.47 references
+- Personal identifiers are never injected into the visa-support content
+- PII fields are emitted as literal blanks:
+  - `PATIENT NAME: ___________________________`
+  - `PASSPORT NUMBER: _______________________`
+  - `CAREGIVER NAME: _________________________`
+- If the case is `Critical`, the tone changes to a medical appeal
+- Otherwise, it stays a medical travel support letter
 
----
+## Architecture
 
-## 🛠️ Project Structure
-- `agents/`: Core multi-agent logic (`medical_agent.py`, `rerank_agent.py`, `flight_agent.py`, `charity_agent.py`).
-- `pipeline/`: Data ingestion and vectorization logic.
-- `tests/`: 
-  - `pipeline_tester.html`: New premium GUI tool for interactive pipeline verification.
-  - `test_charity_rag.py`: Tests for regional and country-priority matching.
-- `docker-compose.yml`: Fully containerized orchestration with Ollama and ChromaDB.
+### Layer 1: Clinical extraction
 
----
+- OCR extracts raw chart text
+- The chart is translated to English for internal parsing
+- The parser extracts:
+  - condition
+  - sub-specialty inference
+  - severity
+  - age group
+  - urgency
 
-## ⚙️ How to Run
+### Layer 2: Hospital matching
 
-### 1. Start via Docker (Recommended)
-This will automatically pull the AI models and ready the medical database:
+- ChromaDB semantic retrieval plus keyword fusion
+- Specialty-group filtering
+- Metadata-aware ranking
+- LLM reranking for final specialist recommendations
+
+### Layer 3: Flight and logistics matching
+
+- Mobility-aware transport recommendations
+- Commercial flight suggestions for standard cases
+- Charter escalation path for stretcher cases
+
+### Layer 4: Charity matching
+
+- Two-stage RAG matching
+- Country-priority and ASEAN regional logic
+- Focused support for oncology and cardiology use cases
+
+### Layer 5: Documentation
+
+- PDF generation with `fpdf2`
+- Country-selected translation for user-facing letters
+- Placeholder-safe translation preserving blank PII lines
+
+## Multilingual behavior
+
+The selected country drives:
+
+- interface language
+- dynamic recommendation translation
+- generated support-letter language
+
+Current frontend language mappings include:
+
+- Brunei -> Malay
+- Cambodia -> Khmer
+- Indonesia -> Indonesian
+- Laos -> Lao
+- Malaysia -> Malay
+- Myanmar -> Burmese
+- Philippines -> Filipino
+- Singapore -> English
+- Thailand -> Thai
+- Vietnam -> Vietnamese
+
+## Key routes
+
+- `GET /` - health check
+- `GET /tester` - main user interface
+- `POST /api/v1/extract` - OCR, translation, structured clinical extraction
+- `POST /api/v1/match-hospitals` - hospital / specialist matches
+- `POST /api/v1/match-flights` - flight and transport options
+- `POST /api/v1/match-charities` - charity matches
+- `POST /api/v1/combine-package` - final package reasoning
+- `POST /api/v1/generate-letter` - PDF letter generation
+- `POST /api/v1/translate-template` - template translation
+- `POST /api/v1/translate-text` - general UI / recommendation translation
+
+## Project structure
+
+- `app.py` - FastAPI entrypoint and API routes
+- `agents/` - hospital, flight, charity, logistics, and orchestration logic
+- `utils/` - OCR helpers, parser, translator, letter generator
+- `frontend/pipeline_tester.html` - country-first multilingual UI served at `/tester`
+- `tests/pipeline_tester.html` - mirrored UI file for local reference
+- `pipeline/` - ingestion and report-generation scripts
+- `data/` - ChromaDB storage
+
+## Run locally with Docker
+
 ```powershell
 docker-compose up --build
 ```
 
-### 2. Test in Browser
-Access the interactive pipeline tester at:
-`http://localhost:8000/tester` (or open `tests/pipeline_tester.html` directly).
+Then open:
 
----
+- [http://localhost:8000/tester](http://localhost:8000/tester)
 
-## 🤖 AI Assistant Contribution
-This project was developed and refined in collaboration with **Antigravity**, an advanced agentic AI coding assistant designed by Google Deepmind. Key contributions include:
-- Implementing the **Hybrid Search Engine (RRF)** for doctor matching.
-- Developing the **ASEAN Sub-Regional logic** for the Charity Agent.
-- Creating the **Premium Pipeline Tester UI** with Age-Group and Clinical Tag support.
-- Orchestrating the multi-stage LLM reranking and package combination logic.
+## Notes
 
----
-**Build for ASEAN AI Hackathon 2026**
+- The backend translates uploaded charts into English for internal extraction, even when the user-facing UI is localized.
+- The served UI now lives in `frontend/` so Docker includes it reliably.
+- Charity matching currently targets oncology and cardiology support paths.
+
+## Build context
+
+Built for ASEAN medical-travel coordination and hackathon-style rapid matching workflows.

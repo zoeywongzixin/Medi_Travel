@@ -3,14 +3,28 @@ from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, Any
 import os
+from pathlib import Path
 from pydantic import BaseModel, Field
 import shutil
 import uvicorn
 
 # Import utilities
 from utils.ocr_engine import extract_raw_text
-from utils.translator import translate_medical_text
+from utils.translator import (
+    translate_document_text,
+    translate_medical_text,
+    translate_template_text,
+    translate_text,
+)
 from utils.parser import get_concise_json, scrub_raw_text
+from utils.letter_generator import (
+    LETTER_SKELETONS,
+    VISA_TEMPLATE_KEYS,
+    build_visa_support_content,
+    fill_template,
+    generate_pdf,
+)
+from fastapi.responses import Response
 
 # Import agents
 from agents.logistics_agent import get_transport_requirements
@@ -54,7 +68,8 @@ def root():
 async def get_tester():
     """Serves the interactive pipeline tester UI directly from the backend."""
     try:
-        with open("tests/pipeline_tester.html", "r", encoding="utf-8") as f:
+        tester_path = Path(__file__).resolve().parent / "frontend" / "pipeline_tester.html"
+        with open(tester_path, "r", encoding="utf-8") as f:
             return f.read()
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Tester UI file not found")
@@ -137,6 +152,38 @@ async def api_match_charities(request: LayerRequest):
     charities = match_charities(request.medical_data, request.origin_country)
     return {"charities": charities}
 
+class TranslateTemplateRequest(BaseModel):
+    template_key: str
+    target_language: str
+
+@app.post("/api/v1/translate-template")
+async def translate_template(request: TranslateTemplateRequest):
+    """
+    Translates the skeleton only using Ollama.
+    Sensitive patient data stays local to comply with healthcare privacy standards.
+    """
+    if request.template_key not in LETTER_SKELETONS:
+        raise HTTPException(status_code=404, detail="Template not found")
+    
+    skeleton = LETTER_SKELETONS[request.template_key]
+    translated = translate_template_text(skeleton, request.target_language)
+    
+    return {"translated_template": translated}
+
+
+class TranslateTextRequest(BaseModel):
+    text: str
+    target_language: str
+
+
+@app.post("/api/v1/translate-text")
+async def api_translate_text(request: TranslateTextRequest):
+    """Translates arbitrary display text to the requested language."""
+    if not request.text.strip():
+        return {"translated_text": ""}
+    translated = translate_text(request.text, request.target_language)
+    return {"translated_text": translated}
+
 @app.post("/api/v1/combine-package")
 async def api_combine_package(request: CombinePackageRequest):
     """Generates the final package reasoning based on user selections."""
@@ -149,6 +196,46 @@ async def api_combine_package(request: CombinePackageRequest):
         budget_usd=request.budget_usd
     )
     return {"package": package}
+    
+class GenerateLetterRequest(BaseModel):
+    template_key: str
+    user_data: Dict[str, Any] = Field(default_factory=dict)
+    medical_data: Optional[Dict[str, Any]] = None
+    package_data: Optional[Dict[str, Any]] = None
+    target_language: Optional[str] = None
+
+@app.post("/api/v1/generate-letter")
+async def api_generate_letter(request: GenerateLetterRequest):
+    """Generates a PDF letter based on a template and user data."""
+    if request.template_key not in LETTER_SKELETONS:
+        raise HTTPException(status_code=404, detail="Template not found")
+    
+    template = LETTER_SKELETONS[request.template_key]
+    try:
+        if request.template_key in VISA_TEMPLATE_KEYS:
+            content = build_visa_support_content(
+                user_data=request.user_data,
+                medical_data=request.medical_data,
+                package_data=request.package_data,
+            )
+        else:
+            content = fill_template(template, request.user_data)
+
+        if request.target_language and request.target_language.lower() not in {"english", "en"}:
+            content = translate_document_text(content, request.target_language)
+
+        print(f"DEBUG: Content to be PDFed: {content}")
+        pdf_bytes = generate_pdf(content)
+        
+        filename = f"{request.template_key}.pdf"
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+    except Exception as e:
+        print(f"CRITICAL PDF ERROR: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"PDF Generation failed: {str(e)}")
 
 @app.post("/api/v1/full-pipeline")
 async def full_pipeline(

@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, Any
 import os
@@ -13,7 +14,11 @@ from utils.parser import get_concise_json, scrub_raw_text
 
 # Import agents
 from agents.logistics_agent import get_transport_requirements
-from agents.orchestrator import orchestrate_packages
+from agents.orchestrator import orchestrate_packages, generate_single_package
+from agents.medical_agent import match_hospitals
+from agents.flight_agent import get_flight_options
+from agents.charity_agent import match_charities
+from typing import Optional
 
 app = FastAPI(title="Malaysia Medical Match API", version="1.0.0")
 
@@ -29,9 +34,30 @@ class MatchRequest(BaseModel):
     origin_country: str = Field(default="Indonesia", description="Where the patient is flying from")
     budget_usd: int = Field(default=5000, description="Patient's maximum budget in USD")
 
+class LayerRequest(BaseModel):
+    medical_data: Dict[str, Any]
+    origin_country: str = Field(default="Indonesia", description="Where the patient is flying from")
+
+class CombinePackageRequest(BaseModel):
+    hospital: Dict[str, Any]
+    logistics_data: Dict[str, Any]
+    flight: Optional[Dict[str, Any]] = None
+    charity: Optional[Dict[str, Any]] = None
+    origin_country: str = Field(default="Indonesia")
+    budget_usd: int = Field(default=5000)
+
 @app.get("/")
 def root():
     return {"status": "ok", "message": "Multi-layer Agent Backend is running."}
+
+@app.get("/tester", response_class=HTMLResponse)
+async def get_tester():
+    """Serves the interactive pipeline tester UI directly from the backend."""
+    try:
+        with open("tests/pipeline_tester.html", "r", encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Tester UI file not found")
 
 @app.post("/api/v1/extract")
 async def extract_chart(file: UploadFile = File(...)):
@@ -91,6 +117,38 @@ async def match_packages(request: MatchRequest):
         "logistics": logistics_data,
         "recommended_packages": packages
     }
+
+@app.post("/api/v1/match-hospitals")
+async def api_match_hospitals(request: LayerRequest):
+    """Returns top 3 hospitals for the given medical data."""
+    hospitals = match_hospitals(request.medical_data)
+    return {"hospitals": hospitals}
+
+@app.post("/api/v1/match-flights")
+async def api_match_flights(request: LayerRequest):
+    """Returns top 3 flights based on logistics needs."""
+    logistics_data = get_transport_requirements(request.medical_data, origin=request.origin_country, destination="Malaysia")
+    logistics = get_flight_options(logistics_data, request.origin_country)
+    return {"logistics_data": logistics_data, "flight_options": logistics}
+
+@app.post("/api/v1/match-charities")
+async def api_match_charities(request: LayerRequest):
+    """Returns top 3 charities based on medical data and origin."""
+    charities = match_charities(request.medical_data, request.origin_country)
+    return {"charities": charities}
+
+@app.post("/api/v1/combine-package")
+async def api_combine_package(request: CombinePackageRequest):
+    """Generates the final package reasoning based on user selections."""
+    package = generate_single_package(
+        hospital=request.hospital,
+        logistics_data=request.logistics_data,
+        flight=request.flight,
+        charity=request.charity,
+        origin_country=request.origin_country,
+        budget_usd=request.budget_usd
+    )
+    return {"package": package}
 
 @app.post("/api/v1/full-pipeline")
 async def full_pipeline(

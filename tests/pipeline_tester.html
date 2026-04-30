@@ -3,41 +3,54 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pipeline Tester | Medical Matching</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+    <title>Interactive Pipeline Tester | Medical Matching</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg: #0f172a;
             --card: #1e293b;
+            --card-hover: #334155;
             --primary: #8b5cf6;
+            --success: #10b981;
             --text: #f8fafc;
             --muted: #94a3b8;
+            --border: #334155;
+            --selected: rgba(139, 92, 246, 0.2);
+            --selected-border: #a78bfa;
         }
         body {
             font-family: 'Inter', sans-serif;
             background: var(--bg);
             color: var(--text);
-            max-width: 800px;
+            max-width: 1200px;
             margin: 40px auto;
             padding: 0 20px;
         }
-        h1 { font-family: 'Outfit', sans-serif; font-weight: 800; color: var(--primary); }
+        h1, h2, h3 { font-family: 'Outfit', sans-serif; }
+        h1 { font-weight: 800; color: var(--primary); text-align: center; margin-bottom: 5px;}
+        h2 { font-weight: 600; color: var(--text); margin-top: 0;}
+        .subtitle { color: var(--muted); text-align: center; margin-bottom: 40px; }
+        
         .card {
             background: var(--card);
-            padding: 30px;
+            padding: 24px;
             border-radius: 16px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            border: 1px solid var(--border);
+            margin-bottom: 24px;
         }
+        
+        /* Form elements */
         .form-group { margin-bottom: 20px; }
         label { display: block; margin-bottom: 8px; font-weight: 500; font-size: 0.9rem; color: var(--muted); }
         input[type="text"], input[type="number"], input[type="file"] {
             width: 100%;
             padding: 12px;
             background: #0f172a;
-            border: 1px solid #334155;
+            border: 1px solid var(--border);
             border-radius: 8px;
             color: white;
             outline: none;
+            box-sizing: border-box;
         }
         button {
             background: var(--primary);
@@ -48,85 +61,401 @@
             font-weight: 600;
             cursor: pointer;
             transition: opacity 0.2s;
+            width: 100%;
         }
         button:hover { opacity: 0.9; }
-        #result {
-            margin-top: 30px;
-            padding: 20px;
+        button:disabled { background: var(--muted); cursor: not-allowed; }
+        
+        /* Wizard Layout */
+        .wizard-step { display: none; }
+        .wizard-step.active { display: block; }
+        
+        /* Columns for choices */
+        .choices-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .column {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .column-header {
+            font-size: 1.2rem;
+            color: var(--primary);
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+        }
+        
+        /* Option Cards */
+        .option-card {
+            background: var(--bg);
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .option-card:hover {
+            border-color: var(--muted);
+            background: var(--card-hover);
+        }
+        .option-card.selected {
+            border-color: var(--selected-border);
+            background: var(--selected);
+            box-shadow: 0 0 0 1px var(--selected-border);
+        }
+        .option-title { font-weight: 600; font-size: 1.1rem; margin-bottom: 8px; color: var(--text); }
+        .option-detail { font-size: 0.85rem; color: var(--muted); margin-bottom: 4px; }
+        .option-badge { 
+            display: inline-block; 
+            background: rgba(255,255,255,0.1); 
+            padding: 2px 8px; 
+            border-radius: 4px; 
+            font-size: 0.75rem; 
+            margin-top: 8px;
+            color: var(--success);
+        }
+
+        /* Results / JSON areas */
+        .code-block {
+            padding: 16px;
             background: #020617;
             border-radius: 8px;
             white-space: pre-wrap;
             font-family: monospace;
             font-size: 0.85rem;
-            color: #10b981;
-            border: 1px solid #1e293b;
-            display: none;
+            color: var(--success);
+            border: 1px solid var(--border);
+            max-height: 300px;
+            overflow-y: auto;
         }
-        .loading { display: none; margin-top: 20px; color: var(--primary); font-weight: 600; }
+        
+        .loading { display: none; text-align: center; padding: 20px; color: var(--primary); font-weight: 600; }
+        .loader-spinner {
+            border: 4px solid rgba(255,255,255,0.1);
+            border-left-color: var(--primary);
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        #finalPackage { display: none; }
+        .package-reasoning {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            color: var(--text);
+            border-left: 4px solid var(--primary);
+            padding-left: 16px;
+            margin: 20px 0;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
-    <h1>🩺 Pipeline Tester</h1>
-    <p style="color: var(--muted); margin-bottom: 30px;">Upload a medical report to test the end-to-end multi-agent matching flow.</p>
+    <h1>🩺 Interactive Pipeline Tester</h1>
+    <p class="subtitle">Step-by-step layer matching. You are in control.</p>
 
-    <div class="card">
-        <form id="testerForm">
-            <div class="form-group">
-                <label>Medical Report (Image or PDF)</label>
-                <input type="file" id="reportFile" required>
-            </div>
-            <div class="form-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                <div>
-                    <label>Origin Country</label>
-                    <input type="text" id="origin" value="Vietnam">
+    <!-- STEP 1: UPLOAD -->
+    <div id="step1" class="wizard-step active">
+        <div class="card">
+            <h2>Step 1: Patient Data Input</h2>
+            <form id="extractForm">
+                <div class="form-group">
+                    <label>Medical Report (Image or PDF)</label>
+                    <input type="file" id="reportFile" required>
                 </div>
-                <div>
-                    <label>Budget (USD)</label>
-                    <input type="number" id="budget" value="5000">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                    <div>
+                        <label>Origin Country</label>
+                        <input type="text" id="origin" value="Vietnam">
+                    </div>
+                    <div>
+                        <label>Budget (USD)</label>
+                        <input type="number" id="budget" value="5000">
+                    </div>
                 </div>
+                <button type="submit" id="extractBtn">Extract & Analyze Data</button>
+            </form>
+            <div id="loading1" class="loading">
+                <div class="loader-spinner"></div>
+                Analyzing medical chart...
             </div>
-            <button type="submit" id="submitBtn">Run Pipeline Match</button>
-        </form>
-        
-        <div class="loading" id="loading">Processing... (this may take 10-30 seconds)</div>
-        <div id="result"></div>
+            <div id="extractedDataContainer" style="display: none; margin-top: 20px;">
+                <label>Extracted Medical Data:</label>
+                <div class="code-block" id="extractedData"></div>
+                <button id="proceedToLayersBtn" style="margin-top: 20px;">Proceed to Layer Matching</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- STEP 2: LAYER MATCHING (CHOICES) -->
+    <div id="step2" class="wizard-step">
+        <div class="card">
+            <h2>Step 2: Build Your Package</h2>
+            <p style="color: var(--muted); margin-bottom: 20px;">Select one option from each layer.</p>
+            
+            <div id="loading2" class="loading">
+                <div class="loader-spinner"></div>
+                Running specialized AI agents (Hospitals, Flights, Charities)...
+            </div>
+
+            <div id="choicesArea" style="display: none;">
+                <div class="choices-grid">
+                    <!-- Hospitals Column -->
+                    <div class="column">
+                        <div class="column-header">🏥 Medical Care</div>
+                        <div id="hospitalList"></div>
+                    </div>
+                    
+                    <!-- Flights Column -->
+                    <div class="column">
+                        <div class="column-header">✈️ Logistics</div>
+                        <div id="flightList"></div>
+                    </div>
+                    
+                    <!-- Charities Column -->
+                    <div class="column">
+                        <div class="column-header">🤝 Financial Aid</div>
+                        <div id="charityList"></div>
+                    </div>
+                </div>
+                
+                <button id="combineBtn" disabled>Generate Final Package (Select 1 from each)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- STEP 3: FINAL PACKAGE -->
+    <div id="step3" class="wizard-step">
+        <div class="card">
+            <h2>Step 3: Final Recommendation</h2>
+            
+            <div id="loading3" class="loading">
+                <div class="loader-spinner"></div>
+                AI Orchestrator is generating personalized package reasoning...
+            </div>
+            
+            <div id="finalPackage">
+                <div class="package-reasoning" id="packageReasoning"></div>
+                <label>Full Package Data JSON:</label>
+                <div class="code-block" id="finalPackageData"></div>
+                <button onclick="location.reload()" style="margin-top: 20px; background: var(--card-hover);">Start Over</button>
+            </div>
+        </div>
     </div>
 
     <script>
-        document.getElementById('testerForm').addEventListener('submit', async (e) => {
+        // Global State
+        let globalMedicalData = null;
+        let globalLogisticsData = null; // Ground transport and notes
+        let originCountry = "";
+        let budgetUsd = 0;
+        
+        let selections = {
+            hospital: null,
+            flight: null,
+            charity: null
+        };
+
+        const checkSelections = () => {
+            // Charity is optional if list is empty, but let's require clicking if there are options
+            const hospitalSelected = selections.hospital !== null;
+            const flightSelected = selections.flight !== null || document.getElementById('flightList').children.length === 0;
+            const charitySelected = selections.charity !== null || document.getElementById('charityList').children.length === 0;
+            
+            document.getElementById('combineBtn').disabled = !(hospitalSelected && flightSelected && charitySelected);
+        };
+
+        const createOptionCard = (containerId, type, item, index, renderFunc) => {
+            const container = document.getElementById(containerId);
+            const card = document.createElement('div');
+            card.className = 'option-card';
+            card.innerHTML = renderFunc(item);
+            
+            card.addEventListener('click', () => {
+                // Deselect others in this column
+                const allCards = container.querySelectorAll('.option-card');
+                allCards.forEach(c => c.classList.remove('selected'));
+                
+                // Select this one
+                card.classList.add('selected');
+                selections[type] = item;
+                checkSelections();
+            });
+            
+            container.appendChild(card);
+        };
+
+        // --- STEP 1: EXTRACTION ---
+        document.getElementById('extractForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const fileInput = document.getElementById('reportFile');
-            const origin = document.getElementById('origin').value;
-            const budget = document.getElementById('budget').value;
-            const resultDiv = document.getElementById('result');
-            const loading = document.getElementById('loading');
-            const btn = document.getElementById('submitBtn');
-
+            originCountry = document.getElementById('origin').value;
+            budgetUsd = parseInt(document.getElementById('budget').value, 10);
+            
             if (!fileInput.files[0]) return;
 
-            loading.style.display = 'block';
-            resultDiv.style.display = 'none';
-            btn.disabled = true;
+            document.getElementById('loading1').style.display = 'block';
+            document.getElementById('extractBtn').disabled = true;
 
             const formData = new FormData();
             formData.append('file', fileInput.files[0]);
-            formData.append('origin_country', origin);
-            formData.append('budget_usd', budget);
 
             try {
-                const response = await fetch('http://localhost:8000/api/v1/full-pipeline', {
+                // Step 1 API Call
+                const response = await fetch('http://localhost:8000/api/v1/extract', {
                     method: 'POST',
                     body: formData
                 });
                 const data = await response.json();
-                resultDiv.textContent = JSON.stringify(data, null, 2);
-                resultDiv.style.display = 'block';
+                
+                if (data.medical_data) {
+                    globalMedicalData = data.medical_data;
+                    document.getElementById('extractedData').textContent = JSON.stringify(data.medical_data, null, 2);
+                    document.getElementById('extractedDataContainer').style.display = 'block';
+                    document.getElementById('extractForm').style.display = 'none';
+                } else {
+                    alert("Error extracting data: " + JSON.stringify(data));
+                }
             } catch (err) {
-                resultDiv.textContent = 'Error: ' + err.message;
-                resultDiv.style.display = 'block';
+                alert('Error: ' + err.message);
             } finally {
-                loading.style.display = 'none';
-                btn.disabled = false;
+                document.getElementById('loading1').style.display = 'none';
+            }
+        });
+
+        // --- TRANSITION 1 -> 2 ---
+        document.getElementById('proceedToLayersBtn').addEventListener('click', async () => {
+            document.getElementById('step1').classList.remove('active');
+            document.getElementById('step2').classList.add('active');
+            document.getElementById('loading2').style.display = 'block';
+
+            const payload = {
+                medical_data: globalMedicalData,
+                origin_country: originCountry
+            };
+
+            try {
+                // Fetch Layers in parallel
+                const [hospRes, flightRes, charRes] = await Promise.all([
+                    fetch('http://localhost:8000/api/v1/match-hospitals', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(payload)
+                    }),
+                    fetch('http://localhost:8000/api/v1/match-flights', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(payload)
+                    }),
+                    fetch('http://localhost:8000/api/v1/match-charities', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(payload)
+                    })
+                ]);
+
+                const hospData = await hospRes.json();
+                const flightData = await flightRes.json();
+                const charData = await charRes.json();
+
+                globalLogisticsData = flightData.logistics_data;
+
+                // Render Hospitals
+                const hospList = document.getElementById('hospitalList');
+                hospList.innerHTML = '';
+                if (hospData.hospitals && hospData.hospitals.length > 0) {
+                    hospData.hospitals.forEach((h, i) => {
+                        createOptionCard('hospitalList', 'hospital', h, i, (item) => `
+                            <div class="option-title">${item.name || 'Unknown Doctor'}</div>
+                            <div class="option-detail">🏥 ${item.hospital || 'Unknown Hospital'}</div>
+                            <div class="option-detail">🩺 ${item.specialty || 'Specialist'}</div>
+                            <div class="option-badge">Score: ${item.match_score || 'N/A'}</div>
+                        `);
+                    });
+                } else {
+                    hospList.innerHTML = '<div class="option-detail">No hospitals found.</div>';
+                }
+
+                // Render Flights
+                const fList = document.getElementById('flightList');
+                fList.innerHTML = '';
+                const flights = flightData.flight_options ? flightData.flight_options.options : [];
+                if (flights && flights.length > 0) {
+                    flights.forEach((f, i) => {
+                        createOptionCard('flightList', 'flight', f, i, (item) => `
+                            <div class="option-title">${item.airline || item.provider || 'Flight'}</div>
+                            <div class="option-detail">💰 ${item.price || 'Contact for Quote'}</div>
+                            <div class="option-detail">🛫 ${item.type || 'Commercial'}</div>
+                        `);
+                    });
+                } else {
+                    fList.innerHTML = '<div class="option-detail">No flights found.</div>';
+                }
+
+                // Render Charities
+                const cList = document.getElementById('charityList');
+                cList.innerHTML = '';
+                if (charData.charities && charData.charities.length > 0) {
+                    charData.charities.forEach((c, i) => {
+                        createOptionCard('charityList', 'charity', c, i, (item) => `
+                            <div class="option-title">${item.name || 'Fund'}</div>
+                            <div class="option-detail">🏢 ${item.organization || 'Org'}</div>
+                            <div class="option-detail">💵 Max: $${item.max_coverage_usd || 0}</div>
+                        `);
+                    });
+                } else {
+                    cList.innerHTML = '<div class="option-detail">No matching charities (Skip this step).</div>';
+                }
+
+                document.getElementById('choicesArea').style.display = 'block';
+                checkSelections(); // Initial check
+
+            } catch (err) {
+                alert('Error fetching layers: ' + err.message);
+            } finally {
+                document.getElementById('loading2').style.display = 'none';
+            }
+        });
+
+        // --- STEP 3: COMBINE ---
+        document.getElementById('combineBtn').addEventListener('click', async () => {
+            document.getElementById('step2').classList.remove('active');
+            document.getElementById('step3').classList.add('active');
+            document.getElementById('loading3').style.display = 'block';
+
+            const payload = {
+                hospital: selections.hospital,
+                logistics_data: globalLogisticsData || {},
+                flight: selections.flight,
+                charity: selections.charity,
+                origin_country: originCountry,
+                budget_usd: budgetUsd
+            };
+
+            try {
+                const response = await fetch('http://localhost:8000/api/v1/combine-package', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                
+                document.getElementById('packageReasoning').textContent = data.package.package_reasoning;
+                document.getElementById('finalPackageData').textContent = JSON.stringify(data.package, null, 2);
+                document.getElementById('finalPackage').style.display = 'block';
+                
+            } catch (err) {
+                alert('Error combining package: ' + err.message);
+            } finally {
+                document.getElementById('loading3').style.display = 'none';
             }
         });
     </script>

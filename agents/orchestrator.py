@@ -67,3 +67,42 @@ def orchestrate_packages(medical_data: Dict, logistics_data: Dict, origin_countr
         
     print("--- ✅ Orchestration Complete ---\n")
     return packages
+
+def generate_single_package(hospital: Dict, logistics_data: Dict, flight: Dict, charity: Dict, origin_country: str, budget_usd: int) -> Dict:
+    """
+    Generates a single personalized package from user-selected components.
+    """
+    charity_text = f"Charities: {charity['name']}" if charity else "No specific charities"
+    transport_method = logistics_data.get('recommendation', 'Flight')
+    flight_details = f"{flight.get('airline', 'Flight')} - {flight.get('price', 'Unknown price')}" if flight else "No flight selected"
+    
+    prompt = (
+        f"Context: Travel coordination for an international visitor to Malaysia.\n"
+        f"Destination: {hospital.get('hospital', 'Unknown Hospital')}. Origin: {origin_country}. Budget: ${budget_usd} USD.\n"
+        f"Specialist: {hospital.get('name')} ({hospital.get('specialty')})\n"
+        f"Transport: {transport_method}. Selected Flight: {flight_details}\n"
+        f"- {charity_text}\n\n"
+        f"Write two sentences for a travel brochure highlighting why this coordination of hospital reputation and logistics is a great value option."
+    )
+    
+    try:
+        ollama_host = os.getenv("OLLAMA_HOST", "http://ollama:11434")
+        client = ollama.Client(host=ollama_host)
+        response = client.chat(
+            model='llama3.2:3b',
+            messages=[{'role': 'user', 'content': prompt}],
+            options={'temperature': 0.2, 'num_ctx': 800}
+        )
+        package_reasoning = response.message.content.strip()
+    except Exception as e:
+        print(f"  [!] Package reasoning failed: {e}")
+        package_reasoning = "This package combines top medical care, suitable logistics, and available financial aid."
+        
+    return {
+        "package_id": "PKG_CUSTOM",
+        "package_reasoning": package_reasoning,
+        "specialist": hospital,
+        "flight_logistics": logistics_data,
+        "selected_flight": flight,
+        "recommended_charity": charity
+    }

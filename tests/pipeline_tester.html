@@ -3,231 +3,344 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive Pipeline Tester | Medical Matching</title>
+    <title>ASEAN Medical Match | Precision Pipeline Tester</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg: #0f172a;
-            --card: #1e293b;
-            --card-hover: #334155;
+            --bg: #020617;
+            --card: rgba(30, 41, 59, 0.7);
+            --card-hover: rgba(51, 65, 85, 0.9);
             --primary: #8b5cf6;
+            --primary-glow: rgba(139, 92, 246, 0.3);
+            --secondary: #3b82f6;
             --success: #10b981;
             --text: #f8fafc;
             --muted: #94a3b8;
-            --border: #334155;
-            --selected: rgba(139, 92, 246, 0.2);
+            --border: rgba(51, 65, 85, 0.5);
+            --selected: rgba(139, 92, 246, 0.15);
             --selected-border: #a78bfa;
         }
+
+        * { box-sizing: border-box; }
+        
         body {
             font-family: 'Inter', sans-serif;
             background: var(--bg);
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(139, 92, 246, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(59, 130, 246, 0.1) 0px, transparent 50%);
             color: var(--text);
             max-width: 1200px;
-            margin: 40px auto;
-            padding: 0 20px;
+            margin: 0 auto;
+            padding: 60px 20px;
+            min-height: 100vh;
         }
+
         h1, h2, h3 { font-family: 'Outfit', sans-serif; }
-        h1 { font-weight: 800; color: var(--primary); text-align: center; margin-bottom: 5px;}
-        h2 { font-weight: 600; color: var(--text); margin-top: 0;}
-        .subtitle { color: var(--muted); text-align: center; margin-bottom: 40px; }
         
+        .header { text-align: center; margin-bottom: 60px; }
+        h1 { 
+            font-weight: 800; 
+            font-size: 3rem;
+            background: linear-gradient(to right, #a78bfa, #60a5fa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin: 0;
+            letter-spacing: -0.02em;
+        }
+        .subtitle { color: var(--muted); font-size: 1.2rem; margin-top: 10px; }
+
         .card {
             background: var(--card);
-            padding: 24px;
-            border-radius: 16px;
+            backdrop-filter: blur(12px);
+            padding: 32px;
+            border-radius: 24px;
             border: 1px solid var(--border);
-            margin-bottom: 24px;
+            margin-bottom: 32px;
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+            transition: transform 0.3s ease;
         }
         
         /* Form elements */
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+        
         .form-group { margin-bottom: 20px; }
-        label { display: block; margin-bottom: 8px; font-weight: 500; font-size: 0.9rem; color: var(--muted); }
-        input[type="text"], input[type="number"], input[type="file"] {
+        label { display: block; margin-bottom: 10px; font-weight: 600; font-size: 0.85rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+        
+        input[type="text"], input[type="number"], input[type="file"], select {
             width: 100%;
-            padding: 12px;
-            background: #0f172a;
+            padding: 14px 16px;
+            background: rgba(15, 23, 42, 0.6);
             border: 1px solid var(--border);
-            border-radius: 8px;
+            border-radius: 12px;
             color: white;
             outline: none;
-            box-sizing: border-box;
+            font-family: inherit;
+            font-size: 1rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
         }
+        
+        input:focus, select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px var(--primary-glow);
+        }
+
         button {
-            background: var(--primary);
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
             color: white;
             border: none;
-            padding: 14px 24px;
-            border-radius: 8px;
-            font-weight: 600;
+            padding: 16px 32px;
+            border-radius: 14px;
+            font-weight: 700;
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.1rem;
             cursor: pointer;
-            transition: opacity 0.2s;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
         }
-        button:hover { opacity: 0.9; }
-        button:disabled { background: var(--muted); cursor: not-allowed; }
+        button:hover { 
+            transform: translateY(-2px);
+            box-shadow: 0 12px 24px -8px var(--primary-glow);
+        }
+        button:disabled { 
+            background: var(--muted); 
+            cursor: not-allowed; 
+            transform: none;
+            box-shadow: none;
+        }
         
         /* Wizard Layout */
-        .wizard-step { display: none; }
-        .wizard-step.active { display: block; }
+        .wizard-step { display: none; opacity: 0; transform: translateY(20px); transition: all 0.5s ease; }
+        .wizard-step.active { display: block; opacity: 1; transform: translateY(0); }
         
-        /* Columns for choices */
+        /* Choice Grid */
         .choices-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
-            margin-bottom: 30px;
+            gap: 24px;
+            margin-bottom: 40px;
         }
-        .column {
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
+        .column { display: flex; flex-direction: column; gap: 20px; }
         .column-header {
-            font-size: 1.2rem;
-            color: var(--primary);
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding-bottom: 12px;
             border-bottom: 2px solid var(--border);
-            padding-bottom: 10px;
-            margin-bottom: 10px;
         }
         
         /* Option Cards */
         .option-card {
-            background: var(--bg);
-            border: 2px solid var(--border);
-            border-radius: 12px;
-            padding: 16px;
+            background: rgba(15, 23, 42, 0.4);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 20px;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .option-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 4px; height: 100%;
+            background: transparent;
+            transition: background 0.3s;
         }
         .option-card:hover {
-            border-color: var(--muted);
             background: var(--card-hover);
+            border-color: var(--muted);
+            transform: translateX(4px);
         }
         .option-card.selected {
-            border-color: var(--selected-border);
             background: var(--selected);
-            box-shadow: 0 0 0 1px var(--selected-border);
+            border-color: var(--selected-border);
+            box-shadow: 0 0 20px -5px var(--primary-glow);
         }
-        .option-title { font-weight: 600; font-size: 1.1rem; margin-bottom: 8px; color: var(--text); }
-        .option-detail { font-size: 0.85rem; color: var(--muted); margin-bottom: 4px; }
-        .option-badge { 
-            display: inline-block; 
-            background: rgba(255,255,255,0.1); 
+        .option-card.selected::before { background: var(--primary); }
+
+        .option-title { font-weight: 700; font-size: 1.1rem; margin-bottom: 8px; color: var(--text); font-family: 'Outfit', sans-serif; }
+        .option-detail { font-size: 0.9rem; color: var(--muted); margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+        .tag-container { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+        .tag { 
+            font-size: 0.7rem; 
             padding: 2px 8px; 
-            border-radius: 4px; 
-            font-size: 0.75rem; 
-            margin-top: 8px;
+            background: rgba(255,255,255,0.05); 
+            border-radius: 100px; 
+            color: var(--muted); 
+            border: 1px solid var(--border);
+        }
+        .score-badge {
+            position: absolute;
+            top: 16px; right: 16px;
+            font-size: 0.75rem;
+            font-weight: 800;
             color: var(--success);
+            background: rgba(16, 185, 129, 0.1);
+            padding: 4px 10px;
+            border-radius: 100px;
         }
 
-        /* Results / JSON areas */
+        /* Results Display */
         .code-block {
-            padding: 16px;
+            padding: 20px;
             background: #020617;
-            border-radius: 8px;
+            border-radius: 16px;
             white-space: pre-wrap;
-            font-family: monospace;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
             font-size: 0.85rem;
-            color: var(--success);
+            color: #9cdcfe;
             border: 1px solid var(--border);
-            max-height: 300px;
+            max-height: 400px;
             overflow-y: auto;
         }
         
-        .loading { display: none; text-align: center; padding: 20px; color: var(--primary); font-weight: 600; }
+        .loading { display: none; text-align: center; padding: 40px; }
         .loader-spinner {
-            border: 4px solid rgba(255,255,255,0.1);
-            border-left-color: var(--primary);
+            border: 3px solid rgba(139, 92, 246, 0.1);
+            border-top-color: var(--primary);
             border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 10px;
+            width: 40px;
+            height: 40px;
+            animation: spin 0.8s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+            margin: 0 auto 20px;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         
-        #finalPackage { display: none; }
         .package-reasoning {
-            font-size: 1.1rem;
+            font-size: 1.25rem;
             line-height: 1.6;
             color: var(--text);
-            border-left: 4px solid var(--primary);
-            padding-left: 16px;
-            margin: 20px 0;
-            font-style: italic;
+            padding: 32px;
+            background: rgba(139, 92, 246, 0.05);
+            border-radius: 20px;
+            margin: 24px 0;
+            border-left: 6px solid var(--primary);
+            position: relative;
+        }
+        .package-reasoning::after {
+            content: '"';
+            position: absolute;
+            top: 10px; left: 10px;
+            font-size: 4rem; opacity: 0.1; font-family: serif;
+        }
+
+        /* Mobile adjustments */
+        @media (max-width: 900px) {
+            .choices-grid { grid-template-columns: 1fr; }
+            h1 { font-size: 2.2rem; }
         }
     </style>
 </head>
 <body>
-    <h1>🩺 Interactive Pipeline Tester</h1>
-    <p class="subtitle">Step-by-step layer matching. You are in control.</p>
+    <div class="header">
+        <h1>ASEAN Medical Match</h1>
+        <p class="subtitle">Precision AI-driven medical tourism orchestration.</p>
+    </div>
 
     <!-- STEP 1: UPLOAD -->
     <div id="step1" class="wizard-step active">
         <div class="card">
-            <h2>Step 1: Patient Data Input</h2>
+            <h2 style="margin-bottom: 24px;">1. Patient Documentation</h2>
             <form id="extractForm">
                 <div class="form-group">
                     <label>Medical Report (Image or PDF)</label>
                     <input type="file" id="reportFile" required>
                 </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                <div class="form-grid">
                     <div>
                         <label>Origin Country</label>
-                        <input type="text" id="origin" value="Vietnam">
+                        <select id="origin">
+                            <option value="Vietnam">Vietnam</option>
+                            <option value="Indonesia">Indonesia</option>
+                            <option value="Laos">Laos</option>
+                            <option value="Cambodia">Cambodia</option>
+                            <option value="Myanmar">Myanmar</option>
+                            <option value="Philippines">Philippines</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Age Group</label>
+                        <select id="age_group">
+                            <option value="Adult">Adult</option>
+                            <option value="Senior">Senior</option>
+                            <option value="Child">Child</option>
+                            <option value="Infant">Infant</option>
+                        </select>
                     </div>
                     <div>
                         <label>Budget (USD)</label>
                         <input type="number" id="budget" value="5000">
                     </div>
                 </div>
-                <button type="submit" id="extractBtn">Extract & Analyze Data</button>
+                <button type="submit" id="extractBtn">
+                    <span>✨</span> Analyze Clinical Data
+                </button>
             </form>
+            
             <div id="loading1" class="loading">
                 <div class="loader-spinner"></div>
-                Analyzing medical chart...
+                <p>AI OCR & Clinical Extraction in progress...</p>
             </div>
-            <div id="extractedDataContainer" style="display: none; margin-top: 20px;">
-                <label>Extracted Medical Data:</label>
+            
+            <div id="extractedDataContainer" style="display: none; margin-top: 32px;">
+                <label>Extracted Patient Profile:</label>
                 <div class="code-block" id="extractedData"></div>
-                <button id="proceedToLayersBtn" style="margin-top: 20px;">Proceed to Layer Matching</button>
+                <button id="proceedToLayersBtn" style="margin-top: 24px; background: linear-gradient(135deg, #10b981, #3b82f6);">
+                    Proceed to Layer Matching ➔
+                </button>
             </div>
         </div>
     </div>
 
-    <!-- STEP 2: LAYER MATCHING (CHOICES) -->
+    <!-- STEP 2: LAYER MATCHING -->
     <div id="step2" class="wizard-step">
         <div class="card">
-            <h2>Step 2: Build Your Package</h2>
-            <p style="color: var(--muted); margin-bottom: 20px;">Select one option from each layer.</p>
+            <h2 style="margin-bottom: 8px;">2. Orchestration Layer</h2>
+            <p style="color: var(--muted); margin-bottom: 32px;">Configure your personalized medical travel package.</p>
             
             <div id="loading2" class="loading">
                 <div class="loader-spinner"></div>
-                Running specialized AI agents (Hospitals, Flights, Charities)...
+                <p>Consulting with Medical, Logistics, and Financial Agents...</p>
             </div>
 
             <div id="choicesArea" style="display: none;">
                 <div class="choices-grid">
-                    <!-- Hospitals Column -->
+                    <!-- Hospitals -->
                     <div class="column">
-                        <div class="column-header">🏥 Medical Care</div>
+                        <div class="column-header">🏥 Specialty Care</div>
                         <div id="hospitalList"></div>
                     </div>
                     
-                    <!-- Flights Column -->
+                    <!-- Flights -->
                     <div class="column">
                         <div class="column-header">✈️ Logistics</div>
                         <div id="flightList"></div>
                     </div>
                     
-                    <!-- Charities Column -->
+                    <!-- Charities -->
                     <div class="column">
                         <div class="column-header">🤝 Financial Aid</div>
                         <div id="charityList"></div>
                     </div>
                 </div>
                 
-                <button id="combineBtn" disabled>Generate Final Package (Select 1 from each)</button>
+                <button id="combineBtn" disabled>
+                    <span>🎯</span> Generate Clinical Recommendation
+                </button>
             </div>
         </div>
     </div>
@@ -235,28 +348,43 @@
     <!-- STEP 3: FINAL PACKAGE -->
     <div id="step3" class="wizard-step">
         <div class="card">
-            <h2>Step 3: Final Recommendation</h2>
+            <h2 style="margin-bottom: 8px;">3. Final Itinerary</h2>
+            <p style="color: var(--muted); margin-bottom: 24px;">AI-generated orchestration logic for your case.</p>
             
             <div id="loading3" class="loading">
                 <div class="loader-spinner"></div>
-                AI Orchestrator is generating personalized package reasoning...
+                <p>Finalizing clinical reasoning and logistics package...</p>
             </div>
             
-            <div id="finalPackage">
+            <div id="finalPackage" style="display: none;">
                 <div class="package-reasoning" id="packageReasoning"></div>
-                <label>Full Package Data JSON:</label>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px;">
+                    <div class="option-card" style="cursor: default; pointer-events: none;">
+                        <div class="option-title" id="finalHospName"></div>
+                        <div class="option-detail" id="finalHospLoc"></div>
+                    </div>
+                    <div class="option-card" style="cursor: default; pointer-events: none;">
+                        <div class="option-title" id="finalCharityName"></div>
+                        <div class="option-detail" id="finalCharityOrg"></div>
+                    </div>
+                </div>
+
+                <label>System Export (JSON):</label>
                 <div class="code-block" id="finalPackageData"></div>
-                <button onclick="location.reload()" style="margin-top: 20px; background: var(--card-hover);">Start Over</button>
+                <button onclick="location.reload()" style="margin-top: 32px; background: rgba(255,255,255,0.05); color: var(--muted); border: 1px solid var(--border);">
+                    New Patient Assessment
+                </button>
             </div>
         </div>
     </div>
 
     <script>
-        // Global State
         let globalMedicalData = null;
-        let globalLogisticsData = null; // Ground transport and notes
+        let globalLogisticsData = null;
         let originCountry = "";
         let budgetUsd = 0;
+        let ageGroup = "Adult";
         
         let selections = {
             hospital: null,
@@ -265,7 +393,6 @@
         };
 
         const checkSelections = () => {
-            // Charity is optional if list is empty, but let's require clicking if there are options
             const hospitalSelected = selections.hospital !== null;
             const flightSelected = selections.flight !== null || document.getElementById('flightList').children.length === 0;
             const charitySelected = selections.charity !== null || document.getElementById('charityList').children.length === 0;
@@ -280,11 +407,7 @@
             card.innerHTML = renderFunc(item);
             
             card.addEventListener('click', () => {
-                // Deselect others in this column
-                const allCards = container.querySelectorAll('.option-card');
-                allCards.forEach(c => c.classList.remove('selected'));
-                
-                // Select this one
+                container.querySelectorAll('.option-card').forEach(c => c.classList.remove('selected'));
                 card.classList.add('selected');
                 selections[type] = item;
                 checkSelections();
@@ -298,6 +421,7 @@
             e.preventDefault();
             const fileInput = document.getElementById('reportFile');
             originCountry = document.getElementById('origin').value;
+            ageGroup = document.getElementById('age_group').value;
             budgetUsd = parseInt(document.getElementById('budget').value, 10);
             
             if (!fileInput.files[0]) return;
@@ -309,7 +433,6 @@
             formData.append('file', fileInput.files[0]);
 
             try {
-                // Step 1 API Call
                 const response = await fetch('http://localhost:8000/api/v1/extract', {
                     method: 'POST',
                     body: formData
@@ -318,14 +441,17 @@
                 
                 if (data.medical_data) {
                     globalMedicalData = data.medical_data;
+                    // Add age_group to medical_data for downstream agents
+                    globalMedicalData.age_group = ageGroup;
+                    
                     document.getElementById('extractedData').textContent = JSON.stringify(data.medical_data, null, 2);
                     document.getElementById('extractedDataContainer').style.display = 'block';
                     document.getElementById('extractForm').style.display = 'none';
                 } else {
-                    alert("Error extracting data: " + JSON.stringify(data));
+                    alert("Extraction error: " + JSON.stringify(data));
                 }
             } catch (err) {
-                alert('Error: ' + err.message);
+                alert('API Error: ' + err.message);
             } finally {
                 document.getElementById('loading1').style.display = 'none';
             }
@@ -343,7 +469,6 @@
             };
 
             try {
-                // Fetch Layers in parallel
                 const [hospRes, flightRes, charRes] = await Promise.all([
                     fetch('http://localhost:8000/api/v1/match-hospitals', {
                         method: 'POST',
@@ -369,57 +494,60 @@
                 globalLogisticsData = flightData.logistics_data;
 
                 // Render Hospitals
-                const hospList = document.getElementById('hospitalList');
-                hospList.innerHTML = '';
-                if (hospData.hospitals && hospData.hospitals.length > 0) {
+                const hList = document.getElementById('hospitalList');
+                hList.innerHTML = '';
+                if (hospData.hospitals?.length > 0) {
                     hospData.hospitals.forEach((h, i) => {
                         createOptionCard('hospitalList', 'hospital', h, i, (item) => `
-                            <div class="option-title">${item.name || 'Unknown Doctor'}</div>
-                            <div class="option-detail">🏥 ${item.hospital || 'Unknown Hospital'}</div>
-                            <div class="option-detail">🩺 ${item.specialty || 'Specialist'}</div>
-                            <div class="option-badge">Score: ${item.match_score || 'N/A'}</div>
+                            ${item.match_score ? `<div class="score-badge">${item.match_score}</div>` : ''}
+                            <div class="option-title">${item.name || 'Specialist'}</div>
+                            <div class="option-detail">🏥 ${item.hospital || 'Hospital'}</div>
+                            <div class="option-detail">🩺 ${item.specialty || 'Consultant'}</div>
+                            <div class="tag-container">
+                                ${(item.specialty_tags || '').split(',').slice(0, 4).map(t => `<span class="tag">${t.trim()}</span>`).join('')}
+                            </div>
                         `);
                     });
                 } else {
-                    hospList.innerHTML = '<div class="option-detail">No hospitals found.</div>';
+                    hList.innerHTML = '<div class="option-detail">No specialized care found.</div>';
                 }
 
                 // Render Flights
                 const fList = document.getElementById('flightList');
                 fList.innerHTML = '';
-                const flights = flightData.flight_options ? flightData.flight_options.options : [];
-                if (flights && flights.length > 0) {
+                const flights = flightData.flight_options?.options || [];
+                if (flights.length > 0) {
                     flights.forEach((f, i) => {
                         createOptionCard('flightList', 'flight', f, i, (item) => `
-                            <div class="option-title">${item.airline || item.provider || 'Flight'}</div>
-                            <div class="option-detail">💰 ${item.price || 'Contact for Quote'}</div>
-                            <div class="option-detail">🛫 ${item.type || 'Commercial'}</div>
+                            <div class="option-title">${item.airline || 'Carrier'}</div>
+                            <div class="option-detail">🛫 ${item.type || 'Travel'}</div>
+                            <div class="option-detail" style="color: var(--success); font-weight: 700;">${item.price || 'USD TBD'}</div>
                         `);
                     });
                 } else {
-                    fList.innerHTML = '<div class="option-detail">No flights found.</div>';
+                    fList.innerHTML = '<div class="option-detail">No transport options found.</div>';
                 }
 
                 // Render Charities
                 const cList = document.getElementById('charityList');
                 cList.innerHTML = '';
-                if (charData.charities && charData.charities.length > 0) {
+                if (charData.charities?.length > 0) {
                     charData.charities.forEach((c, i) => {
                         createOptionCard('charityList', 'charity', c, i, (item) => `
-                            <div class="option-title">${item.name || 'Fund'}</div>
-                            <div class="option-detail">🏢 ${item.organization || 'Org'}</div>
-                            <div class="option-detail">💵 Max: $${item.max_coverage_usd || 0}</div>
+                            <div class="option-title">${item.name || 'Financial Aid'}</div>
+                            <div class="option-detail">🏢 ${item.organization || 'Non-Profit'}</div>
+                            <div class="option-detail" style="color: var(--primary);">Max Coverage: $${item.max_coverage_usd || 0}</div>
                         `);
                     });
                 } else {
-                    cList.innerHTML = '<div class="option-detail">No matching charities (Skip this step).</div>';
+                    cList.innerHTML = '<div class="option-detail">No regional funds available.</div>';
                 }
 
                 document.getElementById('choicesArea').style.display = 'block';
-                checkSelections(); // Initial check
+                checkSelections();
 
             } catch (err) {
-                alert('Error fetching layers: ' + err.message);
+                alert('Layer Error: ' + err.message);
             } finally {
                 document.getElementById('loading2').style.display = 'none';
             }
@@ -450,10 +578,16 @@
                 
                 document.getElementById('packageReasoning').textContent = data.package.package_reasoning;
                 document.getElementById('finalPackageData').textContent = JSON.stringify(data.package, null, 2);
+                
+                document.getElementById('finalHospName').textContent = selections.hospital?.name || "No Hospital Selected";
+                document.getElementById('finalHospLoc').textContent = selections.hospital?.hospital || "";
+                document.getElementById('finalCharityName').textContent = selections.charity?.name || "No Charity Selected";
+                document.getElementById('finalCharityOrg').textContent = selections.charity?.organization || "";
+                
                 document.getElementById('finalPackage').style.display = 'block';
                 
             } catch (err) {
-                alert('Error combining package: ' + err.message);
+                alert('Orchestration Error: ' + err.message);
             } finally {
                 document.getElementById('loading3').style.display = 'none';
             }

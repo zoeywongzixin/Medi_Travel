@@ -2,79 +2,70 @@
 
 A sophisticated multi-layer AI agentic system designed to match international patients (Medical Tourists) with specialized healthcare providers, logistical support, and financial aid in Malaysia.
 
-## 🚀 Recent Improvements — Stronger Matching Engine
-We have upgraded the core intelligence of the system with a more robust, multi-stage matching pipeline:
+## 🚀 Latest Improvements — Precision & Regional Logic
+We have significantly upgraded the core intelligence of the system with more granular matching and a premium user interface:
 
-- **Hybrid Doctor Search**: Merges **Semantic (Vector)** and **Keyword (Token-Overlap)** ranking using **Reciprocal Rank Fusion (RRF)** for 2x better search precision.
-- **4-Stage Agentic Funnel**: 
-    1.  **Hybrid RAG Search** (Top-20 candidates).
-    2.  **Hard Specialty Gate** (Ensures doctor group matches diagnosis).
-    3.  **Metadata-Enriched Scoring** (Bonuses for Severity, Urgency, and Paediatrics).
-    4.  **LLM Judge (Rerank)** (Ollama compares the Top-5 and selects the final Top-3).
-- **Docker-First Stability**: Now uses **Named Volumes** for ChromaDB to prevent SQLite Disk I/O errors on Windows and includes **Auto-Model Pulling** for Ollama.
+- **Enhanced Charity Intelligence**: Now supports specific ASEAN regional groupings like **CLMV** (Cambodia, Laos, Myanmar, Vietnam), **BIMP-EAGA**, and **IMES** for hyper-local financial aid matching.
+- **Clinical Reranking v2**: Our AI judge (Ollama) now performs **Sub-Specialty Alignment**, matching granular doctor tags against diagnosis and prioritizing **Tier 1 Hospitals** for critical cases.
+- **Age-Aware Orchestration**: Automated detection and logic for Infant, Child, Adult, and Senior patient categories across the entire agentic pipeline.
+- **Premium Pipeline Tester**: A completely redesigned, interactive GUI with glassmorphism aesthetics and step-by-step clinical verification.
+- **Hybrid Doctor Search**: Merges **Semantic (Vector)** and **Keyword (Token-Overlap)** ranking using **Reciprocal Rank Fusion (RRF)** for high search precision.
 
 ## 🧠 AI Architecture & Data Layers
 
 Our system is built as a **Multi-Layer Agentic Orchestrator**. Each layer uses specific AI tools to ensure accuracy and transparency.
 
-### Layer 1: Medical Specialist Matching (Stronger Engine)
+### Layer 1: Medical Specialist Matching (Precision Engine)
 *   **AI Tools**: **Ollama (Llama 3.2:3b)** + **ChromaDB (Hybrid RAG)**.
 *   **Enriched Logic**:
-    *   **Severity Boost**: Critical cases are automatically prioritized for Government specialist centers (IKN, IJN).
-    *   **Urgency Boost**: High-urgency cases favor doctors with Full Registration numbers (Senior Consultants).
-    *   **Paediatric Focus**: Auto-detects child patients and boosts specialists with paediatric experience.
-*   **Reranking**: An LLM agent acts as a final "Judge" to compare the top candidates based on the actual case summary.
+    *   **Sub-Specialty Alignment**: Matches doctor "specialty tags" (e.g., *Robotic Urology*) directly against patient diagnosis.
+    *   **Hospital Tiers**: Critical cases are prioritized for Tier 1 specialized centers (advanced technology & higher care).
+    *   **Age-Group Context**: Reranking logic adjusts based on the patient's age (Paediatric vs. Geriatric expertise).
+    *   **Urgency Boost**: High-urgency cases favor senior consultants with Full Registration status.
 
 ### Layer 2: Logistics & Flight Intelligence
 *   **AI Tools**: **Official SerpApi Client** + **Logistic Reasoning Engine**.
 *   **How it Works**: 
     1.  Analyzes the patient's medical chart to determine mobility (Ambulatory vs. Stretcher).
-    2.  If ambulatory, it fetches **LIVE flight data** (prices, times, airlines).
-    3.  If stretcher-bound, it generates a professional **Medical Charter Email Draft**.
+    2.  Fetches **LIVE flight data** or generates a **Medical Charter Email Draft** based on transport needs.
 
-### Layer 3: Financial Aid & Charity Matching
-*   **AI Tools**: **Semantic Vector Matching** + **Ollama Eligibility Reasoning**.
-*   **Strict Scope**: Only matches for **Oncology** and **Cardiology** cases.
-*   **Fund Matching**: Prioritizes funds based on patient severity and origin country coverage.
+### Layer 3: Financial Aid & Charity Matching (Regional RAG)
+*   **AI Tools**: **Semantic Vector Matching** + **ASEAN Regional Logic**.
+*   **Regional Groupings**: Explicit logic for **CLMV**, **BIMP-EAGA**, and **IMES** groupings to prioritize funds originating from or targeting the patient's sub-region.
+*   **Strict Scope**: Focused on **Oncology** and **Cardiology** high-cost surgical cases.
 
 ---
 
 ## 🛠️ Project Structure
 - `agents/`: Core multi-agent logic (`medical_agent.py`, `rerank_agent.py`, `flight_agent.py`, `charity_agent.py`).
-- `pipeline/`: Data ingestion (`ingest_doctors.py`, `ingest_charities.py`).
+- `pipeline/`: Data ingestion and vectorization logic.
 - `tests/`: 
-  - `pipeline_tester.html`: GUI tool for manual pipeline testing.
-  - `test_hybrid_matching.py`: Unit tests for the new search engine.
-- `docker-compose.yml`: Production-ready orchestration with Ollama and backend.
+  - `pipeline_tester.html`: New premium GUI tool for interactive pipeline verification.
+  - `test_charity_rag.py`: Tests for regional and country-priority matching.
+- `docker-compose.yml`: Fully containerized orchestration with Ollama and ChromaDB.
 
 ---
 
 ## ⚙️ How to Run
 
 ### 1. Start via Docker (Recommended)
-This will automatically pull the AI models and ingest the medical database:
+This will automatically pull the AI models and ready the medical database:
 ```powershell
 docker-compose up --build
 ```
-*Note: The first run may take 5–10 minutes to download the AI models and ChromaDB components.*
 
 ### 2. Test in Browser
-Once the backend is ready (check for `=== All collections ready ===` in logs), open:
-`c:\Documents\Jasmine\ai_medical_matching\tests\pipeline_tester.html`
-
-### 3. Run Unit Tests (Local)
-```bash
-python tests/test_hybrid_matching.py
-```
+Access the interactive pipeline tester at:
+`http://localhost:8000/tester` (or open `tests/pipeline_tester.html` directly).
 
 ---
 
 ## 🤖 AI Assistant Contribution
 This project was developed and refined in collaboration with **Antigravity**, an advanced agentic AI coding assistant designed by Google Deepmind. Key contributions include:
-- Refactoring the monolithic backend pipeline into an interactive, multi-step wizard.
-- Exposing independent API endpoints for the medical, logistics, and charity layers to enable step-by-step option selection.
-- Implementing a final package combination endpoint for personalized LLM reasoning.
-- Setting up and finalizing the Docker deployment configuration.
+- Implementing the **Hybrid Search Engine (RRF)** for doctor matching.
+- Developing the **ASEAN Sub-Regional logic** for the Charity Agent.
+- Creating the **Premium Pipeline Tester UI** with Age-Group and Clinical Tag support.
+- Orchestrating the multi-stage LLM reranking and package combination logic.
 
 ---
 **Build for ASEAN AI Hackathon 2026**

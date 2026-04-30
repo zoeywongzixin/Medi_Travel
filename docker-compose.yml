@@ -21,9 +21,12 @@ services:
     environment:
       - OLLAMA_HOST=http://ollama:11434
       - CHROMA_ANONYMIZED_TELEMETRY=False
+      - ANONYMIZED_TELEMETRY=False
+      
     volumes:
       - chroma_data:/app/data
       - ./reports:/app/reports
+      - ./model_cache:/root/.cache/chroma/onnx_models
     depends_on:
       - ollama
 

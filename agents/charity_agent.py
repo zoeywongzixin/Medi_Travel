@@ -10,7 +10,7 @@ and lives in the local vector database.
 Country-Priority RAG Logic:
   1. Funds where origin_country == patient's country  (highest priority)
   2. Funds where target_countries includes the patient's country
-  3. Regional ASEAN funds
+  3. Regional ASEAN funds (specific groupings like CLMV)
   4. General international funds
 """
 
@@ -30,6 +30,13 @@ SUPPORTED_CHARITY_AREAS = ("cardiology", "oncology")
 CONDITION_KEYWORDS = {
     "cardiology": ("heart", "cardio", "cardiac", "cardiovascular", "coronary", "jantung"),
     "oncology": ("cancer", "oncology", "tumor", "tumour", "chemotherapy", "radiotherapy", "kanser"),
+}
+
+# ASEAN Regional Groupings
+ASEAN_GROUPS = {
+    "clmv": {"cambodia", "laos", "myanmar", "vietnam"},
+    "bimp-eaga": {"brunei", "indonesia", "malaysia", "philippines"},
+    "imes": {"indonesia", "malaysia", "singapore"},
 }
 
 
@@ -202,14 +209,21 @@ def _priority(
         score += 100          # Fund originated from patient's own country
     if country_lc in target_lc:
         score += 50           # Fund explicitly targets this country
+        
+    # --- Regional ASEAN logic ---
     if "asean" in audience_lc:
         score += 10           # Broad ASEAN coverage
+        
+    for group_name, countries in ASEAN_GROUPS.items():
+        if country_lc in countries:
+            if group_name in audience_lc or group_name in target_lc:
+                score += 25   # Specific ASEAN sub-regional match (e.g., CLMV)
 
     # --- Condition relevance ---
     if allowed_area in cond_lc:
-        score += 20
+        score += 30           # Heavy boost for primary specialty match
     if any(keyword in cond_query_lc for keyword in CONDITION_KEYWORDS.get(allowed_area, ())):
-        score += 10
+        score += 15
 
     # --- Semantic match bonus ---
     if semantic_ids and c.get("id") in semantic_ids:

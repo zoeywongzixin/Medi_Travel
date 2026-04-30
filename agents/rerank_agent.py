@@ -63,18 +63,23 @@ def llm_rerank(candidates: List[Dict], medical_data: Dict, top_n: int = 3) -> Li
         })
 
     system_prompt = (
-        "You are a medical matching expert for a Malaysian healthcare platform. "
-        "Your only task is to rank doctors by suitability for a given patient. "
+        "You are a highly experienced medical coordinator specializing in medical tourism in Malaysia. "
+        "Your goal is to rank 5 doctor candidates by clinical suitability for a patient's specific condition. "
+        "Prioritize based on:\n"
+        "1. Sub-specialty match: Does the doctor's specific tags align with the patient's condition details?\n"
+        "2. Hospital Tier: For Critical/High severity, prioritize Tier 1 hospitals (advanced equipment).\n"
+        "3. Registration status: Valid registration is mandatory.\n"
+        "4. Specialty Group: Ensure the doctor belongs to the correct clinical group (Oncology, Cardiology, etc.).\n\n"
         "Return ONLY a valid JSON array of doctor IDs in order from most to least suitable. "
-        "Example output: [\"id_a\", \"id_b\", \"id_c\"]. "
-        "Do NOT include any explanation or extra text — only the JSON array."
+        "Do NOT include any explanation or extra text."
     )
 
     user_prompt = (
         f"Patient diagnosis: {diagnosis}\n"
-        f"Severity: {severity} | Urgency: {urgency}\n\n"
+        f"Severity: {severity} | Urgency: {urgency}\n"
+        f"Age Group: {medical_data.get('age_group', 'Not specified')}\n\n"
         f"Compare these {len(candidates)} doctors and return the top {top_n} as a JSON array of IDs "
-        f"(most suitable first):\n\n"
+        f"(most suitable first). Focus on the sub-specialty tags vs patient diagnosis:\n\n"
         f"{json.dumps(candidate_summaries, indent=2)}"
     )
 

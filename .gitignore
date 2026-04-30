@@ -12,3 +12,6 @@ __pycache__/
 
 # Environment Secrets
 .env
+
+# External Binaries
+utils/poppler-*/

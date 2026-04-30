@@ -44,6 +44,79 @@ The visa-support flow is deterministic and formatted for `fpdf2` `multi_cell(...
 
 ## Architecture
 
+```mermaid
+flowchart TB
+    subgraph Client["Multilingual Client (Next.js/HTML)"]
+        UI["ASEAN Flag Selection<br/>& Medical Report Upload"]
+    end
+
+    subgraph API_Gateway["FastAPI Backend Gateway"]
+        E_API["/extract"]
+        M_API["/match-*"]
+        P_API["/combine-package"]
+        L_API["/generate-letter"]
+    end
+
+    subgraph Layer1["Layer 1: AI Clinical Extraction"]
+        direction TB
+        OCR["OCR Engine<br/>(PaddleOCR/EasyOCR)"] --> Scrub["PII Scrubbing<br/>(Deterministic)"]
+        Scrub --> Trans["Medical Translation<br/>(Llama 3.2)"]
+        Trans --> Parse["Clinical Parsing<br/>(Llama 3.2 JSON)"]
+    end
+
+    subgraph Layer2["Layer 2: Hospital Matching Agent"]
+        direction TB
+        ChromaM[("Medical Vector Store<br/>(ChromaDB)")] --> Sem["Semantic Retrieval"]
+        Sem --> Key["Keyword Fusion<br/>(BM25-style)"]
+        Key --> Score["Metadata-Enriched<br/>Scoring"]
+        Score --> Judge["AI Medical Judge<br/>(Llama 3.2 Rerank)"]
+    end
+
+    subgraph Layer3["Layer 3: Logistics & Charity Agents"]
+        direction LR
+        Logistics["Mobility-Aware<br/>Transport Matcher"]
+        Charity["2-Stage RAG<br/>Charity Matcher"]
+    end
+
+    subgraph Layer4["Layer 4: AI Package Orchestrator"]
+        ORCH["Package Synthesis"]
+        Reason["AI Reasoning<br/>(Personalized Itinerary)"]
+        ORCH --- Reason
+    end
+
+    subgraph Layer5["Layer 5: Documentation & Localization"]
+        PDF["PDF Generation<br/>(fpdf2)"]
+        Loc["Localized Templates<br/>(Indonesian, Thai, etc.)"]
+    end
+
+    UI --> E_API
+    E_API --> Layer1
+    Layer1 --> M_API
+    M_API --> Layer2 & Layer3
+    Layer2 & Layer3 --> P_API
+    P_API --> Layer4
+    Layer4 --> L_API
+    L_API --> Layer5
+
+    %% Styling
+    classDef ai_component fill:#e1f5fe,stroke:#01579b,stroke-width:2px,color:#01579b;
+    classDef db_component fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#e65100;
+    classDef core_component fill:#f3e5f5,stroke:#4a148c,stroke-width:2px,color:#4a148c;
+
+    class Trans,Parse,Judge,Reason ai_component;
+    class ChromaM,ChromaC db_component;
+    class ORCH,OCR,PDF core_component;
+```
+
+### AI Integration Details
+
+ASEAN Medical Match utilizes a multi-agent AI architecture powered by **Llama 3.2** (via Ollama) and **ChromaDB**:
+
+*   **AI Clinical Extraction**: Uses LLMs to translate diverse ASEAN medical reports into English and extract structured clinical parameters (Condition, Severity, Urgency) while maintaining PII safety.
+*   **AI Medical Judge**: A specialized Rerank Agent that acts as a clinical coordinator, comparing the top 5 semantic hospital matches and re-ordering them based on sub-specialty alignment and hospital tiering.
+*   **AI Package Orchestration**: Synthesizes disparate data (Medical, Logistics, Charity) into a cohesive travel itinerary with AI-generated reasoning that explains the value proposition to the patient.
+*   **Dynamic Localization**: Real-time translation of both the user interface and generated PDF support letters, ensuring patients receive guidance in their native language.
+
 ### Layer 1: Clinical extraction
 
 - OCR extracts raw chart text

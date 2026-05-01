@@ -26,10 +26,61 @@ LETTER_SKELETONS = {
         "{hospital_name}, Malaysia"
     ),
     "urgent_appeal": "Surat Rayuan Urusan Perubatan\n\nKami memohon pertimbangan segera bagi urusan perubatan pesakit ini, dengan sokongan Borang IM.47.",
-    "mhtc_visa_support": "MALAYSIA HEALTHCARE TRAVEL COUNCIL (MHTC)\nCompliance Liaison Office\n\nOFFICIAL VISA SUPPORT LETTER\n\nTo: The Director of Immigration / Visa Department\nRe: Medical Travel Authorization for {patient_name}\n\nThis letter serves as official confirmation and support for the medical travel of {patient_name} (Passport: {patient_passport}).\n\nThe patient is scheduled for {treatment_type} at {hospital_name} under the clinical supervision of {specialist_name} (MMC Registration No: ____________).\n\nAs per MHTC healthcare travel standards, this case is officially supported under the medical tourism facilitation framework. We kindly request the processing of the necessary medical visa/entry permits, with specific reference to Borang IM.47 (Medical Treatment Support).\n\nAccompanying Escort Details:\nName: {escort_name}\nPassport: {escort_passport}\n\nIssued by,\nMHTC Compliance Liaison Officer\nKuala Lumpur, Malaysia"
+    "mhtc_visa_support": "MALAYSIA HEALTHCARE TRAVEL COUNCIL (MHTC)\nCompliance Liaison Office\n\nOFFICIAL VISA SUPPORT LETTER\n\nTo: The Director of Immigration / Visa Department\nRe: Medical Travel Authorization for {patient_name}\n\nThis letter serves as official confirmation and support for the medical travel of {patient_name} (Passport: {patient_passport}).\n\nThe patient is scheduled for {treatment_type} at {hospital_name} under the clinical supervision of {specialist_name} (MMC Registration No: ____________).\n\nAs per MHTC healthcare travel standards, this case is officially supported under the medical tourism facilitation framework. We kindly request the processing of the necessary medical visa/entry permits, with specific reference to Borang IM.47 (Medical Treatment Support).\n\nAccompanying Escort Details:\nName: {escort_name}\nPassport: {escort_passport}\n\nIssued by,\nMHTC Compliance Liaison Officer\nKuala Lumpur, Malaysia",
+    "official_referral": (
+        "OFFICIAL CLINICAL REFERRAL LETTER\n"
+        "Date: {current_date}\n\n"
+        "To: {specialist_name}, {hospital_name}, Malaysia\n\n"
+        "Dear Dr. {specialist_name},\n\n"
+        "Re: Referral for Medical Assessment and Management\n"
+        "Patient: {patient_name} (Passport: {patient_passport})\n\n"
+        "I am writing to formally refer the above-named patient for further specialist assessment "
+        "and management at your esteemed facility.\n\n"
+        "Clinical Summary:\n"
+        "{clinical_summary}\n\n"
+        "The estimated duration of stay is expected to be around {total_stay_days} days to accommodate "
+        "pre-operative assessment, the procedure, and an adequate recovery observation window.\n\n"
+        "Kindly arrange for the necessary admission protocols upon their arrival.\n\n"
+        "Sincerely,\n"
+        "Referring Medical Officer\n"
+        "Malaysia Medical Match Platform"
+    ),
+    "smart_itinerary": (
+        "SMART MEDICAL TRAVEL ITINERARY\n"
+        "Patient: {patient_name}\n"
+        "Destination: {hospital_name}, Malaysia\n\n"
+        "TRAVEL DATES (Calculated based on clinical estimation):\n"
+        "- Arrival Date: {arrival_date}\n"
+        "- Departure Date: {departure_date}\n"
+        "- Total Estimated Stay: {total_stay_days} days\n\n"
+        "FLIGHT LOGISTICS:\n"
+        "{flight_details}\n\n"
+        "HOSPITAL APPOINTMENT:\n"
+        "Please proceed directly to {hospital_name} on your arrival date for clinical registration "
+        "with {specialist_name}.\n\n"
+        "Note: This itinerary has been algorithmically generated based on your preferred travel month and "
+        "the specific clinical requirements of your diagnosis."
+    ),
+    "charity_memo": (
+        "OFFICIAL FINANCIAL ASSISTANCE MEMO\n"
+        "Date: {current_date}\n\n"
+        "Subject: Potential Financial Subsidy Eligibility\n\n"
+        "Based on the financial assessment comparing the estimated treatment and travel costs "
+        "against the declared budget, the patient {patient_name} has been identified as a candidate "
+        "for financial assistance.\n\n"
+        "MATCHED CHARITY/SUBSIDY PROVIDER:\n"
+        "{charity_details}\n\n"
+        "NEXT STEPS:\n"
+        "The patient or authorized representative is advised to contact the foundation directly "
+        "or through the hospital's international patient center to formalize the subsidy application "
+        "prior to the scheduled treatment.\n\n"
+        "Issued by,\n"
+        "Financial Liaison\n"
+        "Malaysia Medical Match Platform"
+    )
 }
 
-VISA_TEMPLATE_KEYS = {"visa_support", "mhtc_visa_support"}
+VISA_TEMPLATE_KEYS = {"visa_support", "mhtc_visa_support", "official_referral", "smart_itinerary", "charity_memo"}
 UNICODE_FONT_CANDIDATES = (
     Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
     Path("C:/Windows/Fonts/arial.ttf"),
@@ -237,6 +288,26 @@ def build_visa_support_content(
         "MHTC Liaison / Medical Travel Coordination Desk",
         "Malaysia Medical Match Platform",
     ])
+    
+    # Custom dossier parsing
+    if package_data and "clinical_summary" in package_data:
+        cs = package_data["clinical_summary"]
+        user_data["clinical_summary"] = cs.get("professional_summary", "")
+        user_data["total_stay_days"] = cs.get("total_stay_days", "")
+    
+    if package_data and "travel_dates" in package_data:
+        td = package_data["travel_dates"]
+        user_data["arrival_date"] = td.get("arrival_date", "")
+        user_data["departure_date"] = td.get("departure_date", "")
+        
+    user_data["flight_details"] = flight_line
+    user_data["charity_details"] = charity_line
+    user_data["current_date"] = current_date
+    user_data["specialist_name"] = _clean_text(((package_data or {}).get("specialist") or {}).get("name"), "Specialist")
+    user_data["hospital_name"] = _clean_text(((package_data or {}).get("specialist") or {}).get("hospital"), "Hospital")
+    user_data["patient_name"] = _clean_text(user_data.get("patient_name"), "Patient Name")
+    user_data["patient_passport"] = _clean_text(user_data.get("patient_passport"), "Passport No")
+
     return content
 
 def fill_template(template_str: str, user_data: dict) -> str:

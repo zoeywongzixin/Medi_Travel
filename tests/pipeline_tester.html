@@ -367,6 +367,42 @@
             color: var(--muted);
         }
 
+        .modal {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        .modal[hidden] {
+            display: none !important;
+        }
+
+        .modal-content {
+            background: var(--surface);
+            padding: 24px;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+
+        .letter-preview {
+            background: #fff;
+            color: #000;
+            padding: 20px;
+            border-radius: 8px;
+            min-height: 300px;
+            margin: 20px 0;
+            font-family: serif;
+            border: 1px solid #ccc;
+        }
+
         @media (max-width: 720px) {
             .page {
                 padding: 20px 14px 36px;
@@ -382,7 +418,7 @@
     <div class="page">
         <header class="header">
             <h1 class="title" id="appTitle">ASEAN Medical Match</h1>
-            <p class="subtitle" id="appSubtitle">Choose your country to continue in your local language.</p>
+            <p class="subtitle" id="appSubtitle">Lead Orchestrator v1.1 - Choose your country to continue in your local language.</p>
         </header>
 
         <section class="panel" id="countryPanel">
@@ -409,16 +445,26 @@
                         <label for="budget" id="budgetLabel">Budget (USD)</label>
                         <input type="number" id="budget" min="0" value="5000">
                     </div>
+                    <div class="field">
+                        <label for="preferred_month" id="preferredMonthLabel">Preferred travel month</label>
+                        <input type="text" id="preferred_month" placeholder="e.g. August 2026">
+                    </div>
                 </div>
 
                 <div class="form-grid">
                     <div class="field">
-                        <label for="travel_date" id="travelDateLabel">Proposed travel date</label>
-                        <input type="text" id="travel_date" placeholder="e.g. 15 June 2026">
-                    </div>
-                    <div class="field">
-                        <label for="stay_duration" id="stayDurationLabel">Expected stay duration</label>
-                        <input type="text" id="stay_duration" placeholder="e.g. 14 days">
+                        <label for="preferred_language" id="preferredLanguageLabel">Preferred output language</label>
+                        <select id="preferred_language">
+                            <option value="English">English</option>
+                            <option value="Indonesian">Indonesian</option>
+                            <option value="Malay">Malay</option>
+                            <option value="Thai">Thai</option>
+                            <option value="Vietnamese">Vietnamese</option>
+                            <option value="Tagalog">Tagalog</option>
+                            <option value="Burmese">Burmese</option>
+                            <option value="Khmer">Khmer</option>
+                            <option value="Lao">Lao</option>
+                        </select>
                     </div>
                 </div>
 
@@ -503,32 +549,12 @@
             </div>
 
             <div id="choicesArea" hidden>
-                <div class="choice-grid">
-                    <div class="section-stack">
-                        <div>
-                            <h3 class="panel-title" id="hospitalsTitle">Hospitals</h3>
-                            <p class="muted" id="hospitalsHint">Choose the specialist and hospital that best fit the case.</p>
-                        </div>
-                        <div id="hospitalList"></div>
-                    </div>
-                    <div class="section-stack">
-                        <div>
-                            <h3 class="panel-title" id="flightsTitle">Flights</h3>
-                            <p class="muted" id="flightsHint">Choose the travel option that matches the patient's mobility needs.</p>
-                        </div>
-                        <div id="flightList"></div>
-                    </div>
-                    <div class="section-stack">
-                        <div>
-                            <h3 class="panel-title" id="charitiesTitle">Charities</h3>
-                            <p class="muted" id="charitiesHint">Choose the funding option that best matches the country and diagnosis.</p>
-                        </div>
-                        <div id="charityList"></div>
-                    </div>
+                <div class="choice-grid" id="packageGrid">
+                    <!-- 3 Packages will be rendered here -->
                 </div>
 
                 <div class="button-row">
-                    <button type="button" class="primary-btn" id="combineBtn" disabled>Generate itinerary</button>
+                    <button type="button" class="primary-btn" id="combineBtn" disabled>View Itinerary & Dossier</button>
                 </div>
             </div>
         </section>
@@ -584,26 +610,45 @@
         </section>
     </div>
 
+    <!-- Letter Preview Modal -->
+    <div id="letterModal" class="modal" hidden>
+        <div class="modal-content">
+            <h3 class="panel-title">Letter Preview</h3>
+            <div id="letterPreviewContainer" class="letter-preview"></div>
+            <div class="button-row">
+                <button type="button" class="secondary-btn" id="translateLetterBtn">Translate to Local Language</button>
+                <button type="button" class="primary-btn" id="confirmDownloadBtn">Confirm & Download PDF</button>
+                <button type="button" class="secondary-btn" id="closeModalBtn">Cancel</button>
+            </div>
+            <div class="loading" id="letterLoading" hidden>
+                <span class="dot-loader"><span></span><span></span><span></span></span>
+                <span>Processing letter...</span>
+            </div>
+        </div>
+    </div>
+
     <script>
-        const API_BASE = window.location.origin;
+        const API_BASE = window.location.origin === 'null' || window.location.protocol === 'file:' 
+            ? 'http://localhost:8000' 
+            : window.location.origin;
 
         const COUNTRIES = [
-            { key: 'brunei', flag: '🇧🇳', name: 'Brunei', localName: 'Brunei Darussalam', originCountry: 'Brunei', lang: 'ms', targetLanguage: 'Malay', locale: 'ms-BN' },
-            { key: 'cambodia', flag: '🇰🇭', name: 'Cambodia', localName: 'កម្ពុជា', originCountry: 'Cambodia', lang: 'km', targetLanguage: 'Khmer', locale: 'km-KH' },
-            { key: 'indonesia', flag: '🇮🇩', name: 'Indonesia', localName: 'Indonesia', originCountry: 'Indonesia', lang: 'id', targetLanguage: 'Indonesian', locale: 'id-ID' },
-            { key: 'laos', flag: '🇱🇦', name: 'Laos', localName: 'ລາວ', originCountry: 'Laos', lang: 'lo', targetLanguage: 'Lao', locale: 'lo-LA' },
-            { key: 'malaysia', flag: '🇲🇾', name: 'Malaysia', localName: 'Malaysia', originCountry: 'Malaysia', lang: 'ms', targetLanguage: 'Malay', locale: 'ms-MY' },
-            { key: 'myanmar', flag: '🇲🇲', name: 'Myanmar', localName: 'မြန်မာ', originCountry: 'Myanmar', lang: 'my', targetLanguage: 'Burmese', locale: 'my-MM' },
-            { key: 'philippines', flag: '🇵🇭', name: 'Philippines', localName: 'Pilipinas', originCountry: 'Philippines', lang: 'fil', targetLanguage: 'Filipino', locale: 'fil-PH' },
-            { key: 'singapore', flag: '🇸🇬', name: 'Singapore', localName: 'Singapore', originCountry: 'Singapore', lang: 'en', targetLanguage: 'English', locale: 'en-SG' },
-            { key: 'thailand', flag: '🇹🇭', name: 'Thailand', localName: 'ไทย', originCountry: 'Thailand', lang: 'th', targetLanguage: 'Thai', locale: 'th-TH' },
-            { key: 'vietnam', flag: '🇻🇳', name: 'Vietnam', localName: 'Việt Nam', originCountry: 'Vietnam', lang: 'vi', targetLanguage: 'Vietnamese', locale: 'vi-VN' }
+            { key: 'brunei', flag: '🇧🇳', name: 'Brunei', localName: 'Brunei Darussalam', originCountry: 'Brunei', lang: 'ms', targetLanguage: 'Malay', locale: 'ms-BN', currency: 'BND' },
+            { key: 'cambodia', flag: '🇰🇭', name: 'Cambodia', localName: 'កម្ពុជា', originCountry: 'Cambodia', lang: 'km', targetLanguage: 'Khmer', locale: 'km-KH', currency: 'KHR' },
+            { key: 'indonesia', flag: '🇮🇩', name: 'Indonesia', localName: 'Indonesia', originCountry: 'Indonesia', lang: 'id', targetLanguage: 'Indonesian', locale: 'id-ID', currency: 'IDR' },
+            { key: 'laos', flag: '🇱🇦', name: 'Laos', localName: 'ລາວ', originCountry: 'Laos', lang: 'lo', targetLanguage: 'Lao', locale: 'lo-LA', currency: 'LAK' },
+            { key: 'malaysia', flag: '🇲🇾', name: 'Malaysia', localName: 'Malaysia', originCountry: 'Malaysia', lang: 'ms', targetLanguage: 'Malay', locale: 'ms-MY', currency: 'MYR' },
+            { key: 'myanmar', flag: '🇲🇲', name: 'Myanmar', localName: 'မြန်မာ', originCountry: 'Myanmar', lang: 'my', targetLanguage: 'Burmese', locale: 'my-MM', currency: 'MMK' },
+            { key: 'philippines', flag: '🇵🇭', name: 'Philippines', localName: 'Pilipinas', originCountry: 'Philippines', lang: 'fil', targetLanguage: 'Filipino', locale: 'fil-PH', currency: 'PHP' },
+            { key: 'singapore', flag: '🇸🇬', name: 'Singapore', localName: 'Singapore', originCountry: 'Singapore', lang: 'en', targetLanguage: 'English', locale: 'en-SG', currency: 'SGD' },
+            { key: 'thailand', flag: '🇹🇭', name: 'Thailand', localName: 'ไทย', originCountry: 'Thailand', lang: 'th', targetLanguage: 'Thai', locale: 'th-TH', currency: 'THB' },
+            { key: 'vietnam', flag: '🇻🇳', name: 'Vietnam', localName: 'Việt Nam', originCountry: 'Vietnam', lang: 'vi', targetLanguage: 'Vietnamese', locale: 'vi-VN', currency: 'VND' }
         ];
 
         const TEXT = {
             en: {
                 appTitle: 'ASEAN Medical Match',
-                appSubtitle: 'Choose your country to continue in your local language.',
+                appSubtitle: 'Lead Orchestrator v1.1 - Choose your country to continue in your local language.',
                 countryTitle: 'Choose your country',
                 countryHint: 'The page, care guidance, and support letters will follow this language.',
                 selectedCountry: 'Selected country',
@@ -612,8 +657,8 @@
                 uploadHint: 'Upload the patient\'s report first. We will extract the clinical details and prepare matching options.',
                 reportLabel: 'Medical report (image or PDF)',
                 budgetLabel: 'Budget (USD)',
-                travelDateLabel: 'Proposed travel date',
-                stayDurationLabel: 'Expected stay duration',
+                preferredMonthLabel: 'Preferred travel month',
+                preferredLanguageLabel: 'Preferred output language',
                 analyzeButton: 'Analyze medical report',
                 extractLoadingText: 'Reading report and extracting clinical details...',
                 summaryTitle: 'Clinical summary',
@@ -677,8 +722,8 @@
                 uploadHint: 'Muat naik laporan pesakit dahulu. Kami akan mengekstrak butiran klinikal dan menyediakan pilihan padanan.',
                 reportLabel: 'Laporan perubatan (imej atau PDF)',
                 budgetLabel: 'Bajet (USD)',
-                travelDateLabel: 'Cadangan tarikh perjalanan',
-                stayDurationLabel: 'Tempoh jangkaan tinggal',
+                preferredMonthLabel: 'Bulan perjalanan pilihan',
+                preferredLanguageLabel: 'Bahasa output pilihan',
                 analyzeButton: 'Analisis laporan perubatan',
                 extractLoadingText: 'Membaca laporan dan mengekstrak butiran klinikal...',
                 summaryTitle: 'Ringkasan klinikal',
@@ -742,8 +787,8 @@
                 uploadHint: 'Unggah laporan pasien terlebih dahulu. Kami akan mengekstrak detail klinis dan menyiapkan opsi yang cocok.',
                 reportLabel: 'Laporan medis (gambar atau PDF)',
                 budgetLabel: 'Anggaran (USD)',
-                travelDateLabel: 'Rencana tanggal perjalanan',
-                stayDurationLabel: 'Perkiraan lama tinggal',
+                preferredMonthLabel: 'Bulan perjalanan pilihan',
+                preferredLanguageLabel: 'Bahasa output pilihan',
                 analyzeButton: 'Analisis laporan medis',
                 extractLoadingText: 'Membaca laporan dan mengekstrak detail klinis...',
                 summaryTitle: 'Ringkasan klinis',
@@ -1237,9 +1282,19 @@
 
             byId('selectionBar').hidden = false;
             byId('selectedCountryChip').textContent = `${getText('selectedCountry')}: ${currentCountry.flag} ${currentCountry.name}`;
-            byId('selectedLanguageChip').textContent = `${getText('selectedLanguage')}: ${currentCountry.targetLanguage}`;
-
             applyTranslations();
+
+            // Sync the language dropdown
+            if (byId('preferred_language')) {
+                byId('preferred_language').value = currentCountry.targetLanguage;
+            }
+            
+            // Sync budget label - MUST happen AFTER applyTranslations
+            if (byId('budgetLabel')) {
+                const baseLabel = getText('budgetLabel').split(' (')[0];
+                byId('budgetLabel').textContent = `${baseLabel} (${currentCountry.currency})`;
+            }
+
             byId('step1').hidden = false;
             window.scrollTo({ top: byId('step1').offsetTop - 12, behavior: 'smooth' });
         }
@@ -1247,7 +1302,7 @@
         function applyTranslations() {
             const ids = [
                 'appTitle', 'appSubtitle', 'countryTitle', 'countryHint', 'uploadTitle', 'uploadHint',
-                'reportLabel', 'budgetLabel', 'travelDateLabel', 'stayDurationLabel', 'extractBtn',
+                'reportLabel', 'budgetLabel', 'preferredMonthLabel', 'preferredLanguageLabel', 'extractBtn',
                 'extractLoadingText', 'summaryTitle', 'summaryAgeLabel', 'summaryDiagnosisLabel',
                 'summaryUrgencyLabel', 'reviewTitle', 'reviewHint', 'ageGroupLabel', 'severityLabel',
                 'urgencyLabel', 'proceedToLayersBtn', 'rawDataTitle', 'matchingTitle', 'matchingHint',
@@ -1270,8 +1325,9 @@
                 el.textContent = getText(map[id] || id);
             });
 
-            byId('travel_date').placeholder = getText('travelDatePlaceholder');
-            byId('stay_duration').placeholder = getText('stayDurationPlaceholder');
+            if (byId('preferred_month')) {
+                byId('preferred_month').placeholder = getText('travelDatePlaceholder');
+            }
             updateSelectLabels();
 
             if (currentCountry) {
@@ -1452,6 +1508,46 @@
             }
         });
 
+        function renderPackageGrid(packages) {
+            const grid = byId('packageGrid');
+            grid.innerHTML = '';
+            
+            packages.forEach((pkg, index) => {
+                const card = document.createElement('div');
+                card.className = 'option-card';
+                
+                const hospital = pkg.specialist?.hospital || 'Hospital';
+                const specialist = pkg.specialist?.name || 'Specialist';
+                const price = pkg.clinical_summary?.estimated_cost_formatted || (pkg.clinical_summary?.estimated_cost_usd ? `$${pkg.clinical_summary.estimated_cost_usd}` : 'TBD');
+                const dates = pkg.travel_dates ? `${pkg.travel_dates.arrival_date} to ${pkg.travel_dates.departure_date}` : 'Dates calculated upon request';
+                
+                card.innerHTML = `
+                    <div class="score">${pkg.package_type || 'Package'}</div>
+                    <div class="option-title">${hospital}</div>
+                    <div class="option-detail"><strong>Specialist:</strong> ${specialist}</div>
+                    <div class="option-detail"><strong>Estimated Cost:</strong> ${price}</div>
+                    <div class="option-detail"><strong>Calculated Dates:</strong> ${dates}</div>
+                    <div class="tag-row">
+                        <span class="tag">${pkg.package_reasoning ? 'Optimized Reasoning' : ''}</span>
+                        ${pkg.charity ? `<span class="tag">Charity: ${pkg.charity.name}</span>` : ''}
+                    </div>
+                    <details style="margin-top:10px; font-size: 0.85rem; color: var(--muted);">
+                        <summary>Why this package?</summary>
+                        <p style="margin-top:5px; line-height:1.4;">${pkg.package_reasoning}</p>
+                    </details>
+                `;
+                
+                card.addEventListener('click', () => {
+                    grid.querySelectorAll('.option-card').forEach(c => c.classList.remove('selected'));
+                    card.classList.add('selected');
+                    selections.package = pkg;
+                    byId('combineBtn').disabled = false;
+                });
+                
+                grid.appendChild(card);
+            });
+        }
+
         byId('proceedToLayersBtn').addEventListener('click', async () => {
             if (!globalMedicalData || !currentCountry) return;
 
@@ -1462,86 +1558,40 @@
             byId('step2').hidden = false;
             byId('choicesArea').hidden = true;
             setLoading('loading2', true);
-            resetSelections();
+            
+            selections.package = null;
+            byId('combineBtn').disabled = true;
 
             const payload = {
                 medical_data: globalMedicalData,
-                origin_country: currentCountry.originCountry
+                origin_country: currentCountry.originCountry,
+                budget_local: parseFloat(byId('budget').value || '5000'),
+                currency: currentCountry.currency,
+                preferred_month: byId('preferred_month') ? byId('preferred_month').value : 'Next Month',
+                preferred_language: byId('preferred_language') ? byId('preferred_language').value : 'English'
             };
 
             try {
-                const [hospRes, flightRes, charRes] = await Promise.all([
-                    fetch(`${API_BASE}/api/v1/match-hospitals`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    }),
-                    fetch(`${API_BASE}/api/v1/match-flights`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    }),
-                    fetch(`${API_BASE}/api/v1/match-charities`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    })
-                ]);
+                const response = await fetch(`${API_BASE}/api/v1/match-packages`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.detail || 'Matching failed');
+                
+                const packages = data.recommended_packages || [];
+                globalLogisticsData = data.logistics || {};
 
-                const hospData = await hospRes.json();
-                const flightData = await flightRes.json();
-                const charData = await charRes.json();
-                globalLogisticsData = flightData.logistics_data || {};
-
-                if (hospData.hospitals?.length) {
-                    hospData.hospitals.forEach((item) => {
-                        createOptionCard('hospitalList', 'hospital', item, (hospital) => `
-                            ${hospital.match_score ? `<div class="score">Score: ${hospital.match_score}</div>` : ''}
-                            <div class="option-title">${hospital.name || '-'}</div>
-                            <div class="option-detail">${hospital.hospital || '-'}</div>
-                            <div class="option-detail">${hospital.specialty || '-'}</div>
-                            <div class="tag-row">
-                                ${(hospital.specialty_tags || '').split(',').filter(Boolean).slice(0, 4).map((tag) => `<span class="tag">${tag.trim()}</span>`).join('')}
-                            </div>
-                        `);
-                    });
+                if (packages.length) {
+                    renderPackageGrid(packages);
                 } else {
-                    renderEmptyState('hospitalList', getText('noHospitals'));
-                }
-
-                const flights = flightData.flight_options?.options || [];
-                if (flights.length) {
-                    flights.forEach((item) => {
-                        createOptionCard('flightList', 'flight', item, (flight) => `
-                            <div class="option-title">${flight.airline || flight.provider || '-'}</div>
-                            <div class="option-detail">${flight.type || '-'}</div>
-                            <div class="option-detail">${flight.price || '-'}</div>
-                        `);
-                    });
-                } else {
-                    renderEmptyState('flightList', getText('noFlights'));
-                }
-
-                if (charData.charities?.length) {
-                    charData.charities.forEach((item) => {
-                        createOptionCard('charityList', 'charity', item, (charity) => `
-                            ${charity.match_score ? `<div class="score">Score: ${charity.match_score}</div>` : ''}
-                            <div class="option-title">${charity.name || '-'}</div>
-                            <div class="option-detail">${charity.organization || '-'}</div>
-                            <div class="option-detail">USD ${charity.max_coverage_usd || 0}</div>
-                            <div class="tag-row">
-                                ${charity.origin_country === currentCountry.originCountry ? `<span class="tag">${getText('countryMatch')}</span>` : ''}
-                                ${(charity.target_audience || []).slice(0, 3).map((audience) => `<span class="tag">${audience}</span>`).join('')}
-                            </div>
-                        `);
-                    });
-                } else {
-                    renderEmptyState('charityList', getText('noCharities'));
+                    byId('packageGrid').innerHTML = '<div class="info-card"><div class="info-value">No packages could be orchestrated for this case.</div></div>';
                 }
 
                 byId('choicesArea').hidden = false;
                 window.scrollTo({ top: byId('step2').offsetTop - 12, behavior: 'smooth' });
-                checkSelections();
             } catch (error) {
                 alert(error.message);
             } finally {
@@ -1550,44 +1600,27 @@
         });
 
         byId('combineBtn').addEventListener('click', async () => {
-            if (!currentCountry) return;
+            if (!currentCountry || !selections.package) return;
 
             byId('step3').hidden = false;
             byId('finalPackage').hidden = true;
             setLoading('loading3', true);
 
-            const payload = {
-                hospital: selections.hospital,
-                logistics_data: globalLogisticsData || {},
-                flight: selections.flight,
-                charity: selections.charity,
-                origin_country: currentCountry.originCountry,
-                budget_usd: budgetUsd
-            };
+            const pkg = selections.package;
 
             try {
-                const response = await fetch(`${API_BASE}/api/v1/combine-package`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                const data = await response.json();
-                if (!response.ok || !data.package) {
-                    throw new Error(data.detail || 'Combination failed');
-                }
+                // Since package is already translated/orchestrated, we just display it
+                byId('packageReasoning').textContent = pkg.package_reasoning || '-';
+                byId('finalPackageData').textContent = JSON.stringify(pkg, null, 2);
 
-                const translatedReasoning = await translateDynamicText(data.package.package_reasoning || '');
-                byId('packageReasoning').textContent = translatedReasoning || data.package.package_reasoning || '-';
-                byId('finalPackageData').textContent = JSON.stringify(data.package, null, 2);
+                byId('finalHospName').textContent = pkg.specialist?.hospital || '-';
+                byId('finalHospLoc').textContent = pkg.specialist?.name ? `${pkg.specialist.name} - ${pkg.specialist.specialty || ''}` : '';
 
-                byId('finalHospName').textContent = selections.hospital?.hospital || selections.hospital?.name || '-';
-                byId('finalHospLoc').textContent = selections.hospital?.name ? `${selections.hospital.name} - ${selections.hospital.specialty || ''}` : '';
+                byId('finalFlightName').textContent = pkg.flight?.airline || pkg.flight?.provider || 'Commercial Flight';
+                byId('finalFlightDetail').textContent = [pkg.flight?.type, pkg.flight?.price].filter(Boolean).join(' - ');
 
-                byId('finalFlightName').textContent = selections.flight?.airline || selections.flight?.provider || '-';
-                byId('finalFlightDetail').textContent = [selections.flight?.type, selections.flight?.price].filter(Boolean).join(' - ');
-
-                byId('finalCharityName').textContent = selections.charity?.name || '-';
-                byId('finalCharityOrg').textContent = selections.charity?.organization || '';
+                byId('finalCharityName').textContent = pkg.charity?.name || 'No Financial Aid Required';
+                byId('finalCharityOrg').textContent = pkg.charity?.organization || '';
 
                 byId('finalPackage').hidden = false;
                 window.scrollTo({ top: byId('step3').offsetTop - 12, behavior: 'smooth' });
@@ -1598,65 +1631,119 @@
             }
         });
 
-        async function downloadLetter(templateKey) {
-            if (!currentCountry) return;
+        let currentLetterPayload = null;
+        let currentTemplateKey = null;
 
+        function buildLetterPayload(templateKey, targetLanguage) {
             const formatter = new Intl.DateTimeFormat(currentCountry.locale, {
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric'
+                day: 'numeric', month: 'long', year: 'numeric'
             });
 
+            const pkg = selections.package;
             const userData = {
                 appointment_id: `MHTC-${Math.floor(Math.random() * 1000000)}`,
                 current_date: formatter.format(new Date()),
-                hospital_name: selections.hospital?.hospital || 'Selected Hospital',
-                specialist_name: selections.hospital?.name || 'Selected Specialist',
+                hospital_name: pkg.specialist?.hospital || 'Selected Hospital',
+                specialist_name: pkg.specialist?.name || 'Selected Specialist',
                 medical_condition: globalMedicalData?.condition || 'Clinical condition',
                 treatment_type: globalMedicalData?.condition || 'Medical treatment',
-                start_date: byId('travel_date').value || '',
-                duration: byId('stay_duration').value || '',
+                start_date: pkg.travel_dates?.arrival_date || '',
+                duration: pkg.clinical_summary?.estimated_stay_days || '',
                 age_group: globalMedicalData?.age_group || byId('age_group').value
             };
 
+            return {
+                template_key: templateKey,
+                user_data: userData,
+                medical_data: globalMedicalData || {},
+                package_data: { hospital: selections.hospital, flight: selections.flight, charity: selections.charity },
+                target_language: targetLanguage
+            };
+        }
+
+        async function previewLetter(templateKey) {
+            if (!currentCountry || !selections.package) return;
+            currentTemplateKey = templateKey;
+            
+            byId('letterModal').hidden = false;
+            byId('letterPreviewContainer').innerHTML = '';
+            byId('letterLoading').hidden = false;
+            
+            // First load in English
+            currentLetterPayload = buildLetterPayload(templateKey, 'English');
+
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/preview-letter`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(currentLetterPayload)
+                });
+                if (!response.ok) throw new Error('Failed to preview letter');
+                const data = await response.json();
+                byId('letterPreviewContainer').innerHTML = data.html;
+            } catch (error) {
+                alert(error.message);
+                byId('letterModal').hidden = true;
+            } finally {
+                byId('letterLoading').hidden = true;
+            }
+        }
+
+        async function translatePreview() {
+            if (!currentLetterPayload) return;
+            byId('letterLoading').hidden = false;
+            currentLetterPayload.target_language = currentCountry.targetLanguage;
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/preview-letter`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(currentLetterPayload)
+                });
+                if (!response.ok) throw new Error('Failed to translate letter');
+                const data = await response.json();
+                byId('letterPreviewContainer').innerHTML = data.html;
+            } catch (error) {
+                alert(error.message);
+            } finally {
+                byId('letterLoading').hidden = true;
+            }
+        }
+
+        async function downloadPDF() {
+            if (!currentLetterPayload) return;
+            byId('letterLoading').hidden = false;
             try {
                 const response = await fetch(`${API_BASE}/api/v1/generate-letter`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        template_key: templateKey,
-                        user_data: userData,
-                        medical_data: globalMedicalData || {},
-                        package_data: {
-                            hospital: selections.hospital,
-                            flight: selections.flight,
-                            charity: selections.charity
-                        },
-                        target_language: currentCountry.targetLanguage
-                    })
+                    body: JSON.stringify(currentLetterPayload)
                 });
-
-                if (!response.ok) {
-                    throw new Error('Failed to generate PDF');
-                }
-
+                if (!response.ok) throw new Error('Failed to generate PDF');
                 const blob = await response.blob();
                 const url = window.URL.createObjectURL(blob);
                 const link = document.createElement('a');
                 link.href = url;
-                link.download = `${templateKey}.pdf`;
+                link.download = `${currentTemplateKey}.pdf`;
                 document.body.appendChild(link);
                 link.click();
                 link.remove();
                 window.URL.revokeObjectURL(url);
+                byId('letterModal').hidden = true;
             } catch (error) {
                 alert(error.message);
+            } finally {
+                byId('letterLoading').hidden = true;
             }
         }
 
-        byId('dlApptBtn').addEventListener('click', () => downloadLetter('appointment_conf'));
-        byId('dlMhtcBtn').addEventListener('click', () => downloadLetter('mhtc_visa_support'));
-        byId('dlVisaBtn').addEventListener('click', () => downloadLetter('visa_support'));
+        byId('closeModalBtn').addEventListener('click', () => byId('letterModal').hidden = true);
+        byId('translateLetterBtn').addEventListener('click', translatePreview);
+        byId('confirmDownloadBtn').addEventListener('click', downloadPDF);
+
+        byId('dlApptBtn').addEventListener('click', () => previewLetter('appointment_conf'));
+        byId('dlMhtcBtn').addEventListener('click', () => previewLetter('mhtc_visa_support'));
+        byId('dlVisaBtn').addEventListener('click', () => previewLetter('visa_support'));
         byId('restartBtn').addEventListener('click', () => window.location.reload());
 
         renderCountryGrid();

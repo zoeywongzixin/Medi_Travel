@@ -46,7 +46,10 @@ app.add_middleware(
 class MatchRequest(BaseModel):
     medical_data: Dict[str, Any]
     origin_country: str = Field(default="Indonesia", description="Where the patient is flying from")
-    budget_usd: int = Field(default=5000, description="Patient's maximum budget in USD")
+    budget_local: float = Field(default=5000.0, description="Patient's maximum budget in local currency")
+    currency: str = Field(default="USD", description="Currency of the budget")
+    preferred_month: str = Field(default="Next Month", description="User's preferred month for travel")
+    preferred_language: str = Field(default="English", description="Target language for outputs")
 
 class LayerRequest(BaseModel):
     medical_data: Dict[str, Any]
@@ -120,13 +123,25 @@ async def match_packages(request: MatchRequest):
     """
     medical_data = request.medical_data
     origin = request.origin_country
-    budget = request.budget_usd
+    preferred_month = request.preferred_month
+    language = request.preferred_language
+    
+    # Convert local budget to USD for internal logic
+    from utils.currency import convert_to_usd
+    budget_usd = convert_to_usd(request.budget_local, request.currency)
     
     # Analyze logistics
     logistics_data = get_transport_requirements(medical_data, origin=origin, destination="Malaysia")
     
     # Orchestrate packages (Hospital, Flight, Charity)
-    packages = orchestrate_packages(medical_data, logistics_data, origin, budget)
+    packages = orchestrate_packages(medical_data, origin, budget_usd, request.currency, preferred_month)
+    
+    # Translate outputs if necessary
+    if language.lower() not in ["english", "en"]:
+        for p in packages:
+            p["package_reasoning"] = translate_text(p["package_reasoning"], language)
+            if "clinical_summary" in p and "professional_summary" in p["clinical_summary"]:
+                p["clinical_summary"]["professional_summary"] = translate_text(p["clinical_summary"]["professional_summary"], language)
     
     return {
         "logistics": logistics_data,
@@ -204,6 +219,31 @@ class GenerateLetterRequest(BaseModel):
     package_data: Optional[Dict[str, Any]] = None
     target_language: Optional[str] = None
 
+@app.post("/api/v1/preview-letter")
+async def api_preview_letter(request: GenerateLetterRequest):
+    """Returns the HTML string for the requested letter."""
+    if request.template_key not in LETTER_SKELETONS:
+        raise HTTPException(status_code=404, detail="Template not found")
+    
+    template = LETTER_SKELETONS[request.template_key]
+    try:
+        if request.template_key in VISA_TEMPLATE_KEYS:
+            content = build_visa_support_content(
+                user_data=request.user_data,
+                medical_data=request.medical_data,
+                package_data=request.package_data,
+            )
+        else:
+            content = fill_template(template, request.user_data)
+
+        if request.target_language and request.target_language.lower() not in {"english", "en"}:
+            content = translate_document_text(content, request.target_language)
+
+        return {"html": content}
+    except Exception as e:
+        print(f"CRITICAL PDF PREVIEW ERROR: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"PDF Preview failed: {str(e)}")
+
 @app.post("/api/v1/generate-letter")
 async def api_generate_letter(request: GenerateLetterRequest):
     """Generates a PDF letter based on a template and user data."""
@@ -241,7 +281,9 @@ async def api_generate_letter(request: GenerateLetterRequest):
 async def full_pipeline(
     file: UploadFile = File(...),
     origin_country: str = Form("Indonesia"),
-    budget_usd: int = Form(5000)
+    budget_usd: int = Form(5000),
+    preferred_month: str = Form("Next Month"),
+    preferred_language: str = Form("English")
 ):
     """
     Step 3: All-in-One. Upload the chart, enter your country and budget, and instantly get packages.
@@ -263,7 +305,13 @@ async def full_pipeline(
         
         # Match
         logistics_data = get_transport_requirements(medical_data, origin=origin_country, destination="Malaysia")
-        packages = orchestrate_packages(medical_data, logistics_data, origin_country, budget_usd)
+        packages = orchestrate_packages(medical_data, origin_country, budget_usd, preferred_month)
+        
+        if preferred_language.lower() not in ["english", "en"]:
+            for p in packages:
+                p["package_reasoning"] = translate_text(p["package_reasoning"], preferred_language)
+                if "clinical_summary" in p and "professional_summary" in p["clinical_summary"]:
+                    p["clinical_summary"]["professional_summary"] = translate_text(p["clinical_summary"]["professional_summary"], preferred_language)
         
         return {
             "extracted_medical_data": medical_data,

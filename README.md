@@ -1,218 +1,141 @@
-# ASEAN Medical Match
+# 🇲🇾 ASEAN Medical Match: Lead Orchestrator Pipeline
 
-ASEAN Medical Match is a multi-agent medical travel matching platform for patients seeking treatment in Malaysia. It combines clinical extraction, hospital matching, flight planning, charity matching, and visa-support document generation in one workflow.
+ASEAN Medical Match is a high-precision, multi-agent medical tourism platform designed for the ASEAN region. It transforms raw medical charts into structured medical travel dossiers for Malaysia (MHTC).
 
-## What is new
+---
 
-- Country-first onboarding with ASEAN flag selection
-- Simpler UI focused on one guided patient flow
-- Localized interface based on the selected country
-- Translated recommendation text and translated PDF support letters
-- Structured MHTC / Borang IM.47 visa support letters with placeholder-only PII
-- Clinical extraction that now explicitly tracks age group and urgency
-
-## User flow
-
-1. Open the app at `/tester`
-2. Choose an ASEAN country from the flag list
-3. The app switches to that country's language for the UI
-4. Upload a medical report image or PDF
-5. Review extracted clinical fields:
-   - Age Group
-   - Diagnosis
-   - Urgency Status
-6. Select one hospital, one flight, and one charity
-7. Generate the final itinerary and download support letters
-
-## Current letter behavior
-
-The visa-support flow is deterministic and formatted for `fpdf2` `multi_cell(...)` usage.
-
-- The letter includes:
-  - clinical extraction summary
-  - selected hospital
-  - selected flight
-  - selected charity
-  - MHTC and Borang IM.47 references
-- Personal identifiers are never injected into the visa-support content
-- PII fields are emitted as literal blanks:
-  - `PATIENT NAME: ___________________________`
-  - `PASSPORT NUMBER: _______________________`
-  - `CAREGIVER NAME: _________________________`
-- If the case is `Critical`, the tone changes to a medical appeal
-- Otherwise, it stays a medical travel support letter
-
-## Architecture
+## 🏗 Architecture Diagram
 
 ```mermaid
-flowchart TB
-    subgraph Client["Multilingual Client (Next.js/HTML)"]
-        UI["ASEAN Flag Selection<br/>& Medical Report Upload"]
+graph TD
+    subgraph "User Interface"
+        A["[User Input] Report / Budget / Locale"] --> B["Country-Specific Dashboard"]
     end
 
-    subgraph API_Gateway["FastAPI Backend Gateway"]
-        E_API["/extract"]
-        M_API["/match-*"]
-        P_API["/combine-package"]
-        L_API["/generate-letter"]
+    subgraph "Lead Orchestrator (FastAPI)"
+        B --> C["/api/v1/extract"]
+        C --> D["OCR & Parser (Tesseract/LLM)"]
+        
+        D --> F["Orchestration Engine"]
+        
+        subgraph "Phase 1: Parallel Intelligence"
+            F --> G["Medical Agent"]
+            F --> H["Logistics Agent"]
+            F --> I["Financial Agent"]
+        end
+        
+        G --> G1["Stay & Cost Heuristics"]
+        H --> H1["Hospital RAG (ChromaDB)"]
+        H --> H2["Serper API (Live Flights)"]
+        I --> I1["CurrencyFreaks (Live FX)"]
+        I --> I2["Charity RAG (ChromaDB)"]
     end
 
-    subgraph Layer1["Layer 1: AI Clinical Extraction"]
-        direction TB
-        OCR["OCR Engine<br/>(PaddleOCR/EasyOCR)"] --> Scrub["PII Scrubbing<br/>(Deterministic)"]
-        Scrub --> Trans["Medical Translation<br/>(Llama 3.2)"]
-        Trans --> Parse["Clinical Parsing<br/>(Llama 3.2 JSON)"]
+    subgraph "Synthesis & Delivery"
+        G1 & H1 & H2 & I1 & I2 --> J["3-Tier Package Generator"]
+        J --> K["Elite / Optimized / Proximity"]
+        K --> L["Interactive Preview Modal"]
+        L --> M["Multilingual PDF Dossier"]
     end
 
-    subgraph Layer2["Layer 2: Hospital Matching Agent"]
-        direction TB
-        ChromaM[("Medical Vector Store<br/>(ChromaDB)")] --> Sem["Semantic Retrieval"]
-        Sem --> Key["Keyword Fusion<br/>(BM25-style)"]
-        Key --> Score["Metadata-Enriched<br/>Scoring"]
-        Score --> Judge["AI Medical Judge<br/>(Llama 3.2 Rerank)"]
-    end
-
-    subgraph Layer3["Layer 3: Logistics & Charity Agents"]
-        direction LR
-        Logistics["Mobility-Aware<br/>Transport Matcher"]
-        Charity["2-Stage RAG<br/>Charity Matcher"]
-    end
-
-    subgraph Layer4["Layer 4: AI Package Orchestrator"]
-        ORCH["Package Synthesis"]
-        Reason["AI Reasoning<br/>(Personalized Itinerary)"]
-        ORCH --- Reason
-    end
-
-    subgraph Layer5["Layer 5: Documentation & Localization"]
-        PDF["PDF Generation<br/>(fpdf2)"]
-        Loc["Localized Templates<br/>(Indonesian, Thai, etc.)"]
-    end
-
-    UI --> E_API
-    E_API --> Layer1
-    Layer1 --> M_API
-    M_API --> Layer2 & Layer3
-    Layer2 & Layer3 --> P_API
-    P_API --> Layer4
-    Layer4 --> L_API
-    L_API --> Layer5
-
-    %% Styling
-    classDef ai_component fill:#e1f5fe,stroke:#01579b,stroke-width:2px,color:#01579b;
-    classDef db_component fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#e65100;
-    classDef core_component fill:#f3e5f5,stroke:#4a148c,stroke-width:2px,color:#4a148c;
-
-    class Trans,Parse,Judge,Reason ai_component;
-    class ChromaM,ChromaC db_component;
-    class ORCH,OCR,PDF core_component;
+    %% External Data Loops
+    I1 -.->|"Real-time Rates"| I
+    H2 -.->|"Live Inventory"| H
 ```
 
-### AI Integration Details
+---
 
-ASEAN Medical Match utilizes a multi-agent AI architecture powered by **Llama 3.2** (via Ollama) and **ChromaDB**:
+## 🏗 The 3-Layer Orchestration Model
 
-*   **AI Clinical Extraction**: Uses LLMs to translate diverse ASEAN medical reports into English and extract structured clinical parameters (Condition, Severity, Urgency) while maintaining PII safety.
-*   **AI Medical Judge**: A specialized Rerank Agent that acts as a clinical coordinator, comparing the top 5 semantic hospital matches and re-ordering them based on sub-specialty alignment and hospital tiering.
-*   **AI Package Orchestration**: Synthesizes disparate data (Medical, Logistics, Charity) into a cohesive travel itinerary with AI-generated reasoning that explains the value proposition to the patient.
-*   **Dynamic Localization**: Real-time translation of both the user interface and generated PDF support letters, ensuring patients receive guidance in their native language.
+The system follows a strict layered approach to ensure data integrity and clinical accuracy before final packages are synthesized.
 
-### Layer 1: Clinical extraction
+### Layer 1: The Clinical Layer (Input Processing)
+This layer acts as the foundation of the pipeline. It is responsible for converting unstructured data into a "Clinical Ground Truth."
+- **Data Transformation**: Converts raw images or PDFs into structured JSON using **Tesseract OCR** and **Llama 3.2**.
+- **Clinical Profiling**: Extracts critical patient metrics: `Age Group`, `Clinical Severity`, and `Urgency`.
+- **Estimation Engine**: Utilizes keyword-based heuristics to estimate the **Total Stay Duration** (including pre-op and recovery).
+- **Outcome**: A structured "Case Profile" that serves as the query input for subsequent layers.
 
-- OCR extracts raw chart text
-- The chart is translated to English for internal parsing
-- The parser extracts:
-  - condition
-  - sub-specialty inference
-  - severity
-  - age group
-  - urgency
+### Layer 2: The Logistics Layer (Matching & Search)
+Once the medical needs are defined, Layer 2 identifies "Where" and "How" the treatment will happen.
+- **MHTC Hospital Matching**: Performs a semantic similarity search across a database of **100+ MHTC-accredited hospitals**. It filters by specialty and ranks results based on the clinical profile.
+- **Live Logistics Search**: Integrates with the **Serper API** to fetch real-time flight availability and pricing from the patient's home city to Malaysia.
+- **Date Calculation**: Uses a specialized utility to calculate exact arrival and departure dates based on the user's `preferred_month` and the clinical stay estimate.
+- **Outcome**: A set of viable medical and travel options tailored to the patient's condition.
 
-### Layer 2: Hospital matching
+### Layer 3: The Financial Layer (Optimization & Bridging)
+The final layer ensures the medical plan is financially viable for the user.
+- **Live FX Conversion**: Connects to the **CurrencyFreaks API** to fetch real-time exchange rates, allowing users to input budgets in local currency (e.g., IDR) while calculations happen in USD.
+- **Financial Gap Analysis**: Compares the total cost (Hospital + Flight) against the user's budget.
+- **Charity RAG Integration**: If a financial gap is detected, this layer queries a vector store for relevant **ASEAN Charities**. It matches the patient's country and diagnosis to specific funding eligibility criteria.
+- **Outcome**: A finalized budget plan with identified charity subsidies where necessary.
 
-- ChromaDB semantic retrieval plus keyword fusion
-- Specialty-group filtering
-- Metadata-aware ranking
-- LLM reranking for final specialist recommendations
+---
 
-### Layer 3: Flight and logistics matching
+## 🧠 Agent Intelligence Deep-Dive
 
-- Mobility-aware transport recommendations
-- Commercial flight suggestions for standard cases
-- Charter escalation path for stretcher cases
+### 1. Clinical Agent (The Decoder)
+- **OCR Engine**: Utilizes Tesseract and Pillow to extract raw text from medical reports.
+- **Entity Extraction**: Uses Llama 3.2 to parse unstructured text into a JSON schema (Condition, Severity, Urgency, Age Group).
+- **Heuristics Engine**: Maps conditions to `PROCEDURE_HEURISTICS` (e.g., "Knee Replacement" -> 5 days recovery, $7,500 base cost).
 
-### Layer 4: Charity matching
+### 2. Logistics Agent (The Matchmaker)
+- **Hospital RAG**: Queries a **ChromaDB** vector store containing 100+ MHTC-accredited hospitals. It uses semantic similarity to match the patient's condition.
+- **Flight Logistics**: Connects to the **Serper API** to find real-time flights from the patient's home country to KLIA/Penang.
+- **Mobility Logic**: Flags "Stretcher" vs "Wheelchair" requirements based on the severity extracted by the Clinical Agent.
 
-- Two-stage RAG matching
-- Country-priority and ASEAN regional logic
-- Focused support for oncology and cardiology use cases
+### 3. Charity Agent (The Bridge)
+- **Gap Analysis**: `(Estimated Procedure Cost + Flight) - User Budget = The Gap`.
+- **Eligibility Matching**: Only triggers if a financial gap is detected. Queries ChromaDB for ASEAN-specific charities that match the patient's country and diagnosis.
 
-### Layer 5: Documentation
+---
 
-- PDF generation with `fpdf2`
-- Country-selected translation for user-facing letters
-- Placeholder-safe translation preserving blank PII lines
+## 🌍 Multilingual Support & Localization
 
-## Multilingual behavior
+The system is designed for local first-responders and families. It automatically handles:
+- **UI Localization**: Labels, buttons, and hints in English, Indonesian, Malay, Khmer, Burmese, etc.
+- **Dynamic Translation**: Uses LLM translation to convert clinical summaries while preserving medical integrity.
+- **Interactive Preview**: Users can toggle between English and their local language to verify support letters before PDF generation.
 
-The selected country drives:
+---
 
-- interface language
-- dynamic recommendation translation
-- generated support-letter language
+## 📁 Data Structure & RAG
 
-Current frontend language mappings include:
+- **Vector Store**: `data/chroma_db` stores semantic embeddings for:
+  - **Hospitals**: Specialty tags, MHTC accreditation status, and regional rankings.
+  - **Charities**: Funding limits, covered conditions, and country eligibility.
+- **Embeddings**: Utilizes `sentence-transformers` for high-precision semantic search.
 
-- Brunei -> Malay
-- Cambodia -> Khmer
-- Indonesia -> Indonesian
-- Laos -> Lao
-- Malaysia -> Malay
-- Myanmar -> Burmese
-- Philippines -> Filipino
-- Singapore -> English
-- Thailand -> Thai
-- Vietnam -> Vietnamese
+---
 
-## Key routes
+## ⚙️ Setup & Environment
 
-- `GET /` - health check
-- `GET /tester` - main user interface
-- `POST /api/v1/extract` - OCR, translation, structured clinical extraction
-- `POST /api/v1/match-hospitals` - hospital / specialist matches
-- `POST /api/v1/match-flights` - flight and transport options
-- `POST /api/v1/match-charities` - charity matches
-- `POST /api/v1/combine-package` - final package reasoning
-- `POST /api/v1/generate-letter` - PDF letter generation
-- `POST /api/v1/translate-template` - template translation
-- `POST /api/v1/translate-text` - general UI / recommendation translation
+### Prerequisites
+- **Docker & Docker Compose**
+- **Ollama**: Running locally for LLM inference (Llama 3.2).
+- **Tesseract OCR**: (Included in Docker image).
 
-## Project structure
+### Environment Variables (`.env`)
+| Variable | Description |
+| :--- | :--- |
+| `CURRENCY_FREAKS_API_KEY` | Live exchange rates for 10+ ASEAN currencies. |
+| `SERPAPI_KEY` | Real-time flight search via Google Flights. |
+| `OLLAMA_BASE_URL` | Endpoint for the Llama 3.2 engine. |
 
-- `app.py` - FastAPI entrypoint and API routes
-- `agents/` - hospital, flight, charity, logistics, and orchestration logic
-- `utils/` - OCR helpers, parser, translator, letter generator
-- `frontend/pipeline_tester.html` - country-first multilingual UI served at `/tester`
-- `tests/pipeline_tester.html` - mirrored UI file for local reference
-- `pipeline/` - ingestion and report-generation scripts
-- `data/` - ChromaDB storage
+---
 
-## Run locally with Docker
+## ⚙️ API Routes
+
+- `POST /api/v1/extract`: Clinical OCR + Parse.
+- `POST /api/v1/match-packages`: Orchestrates the 3-tier options (Elite, Optimized, Proximity).
+- `POST /api/v1/preview-letter`: Returns HTML preview of Referral/Visa letters.
+- `POST /api/v1/generate-letter`: Final PDF generation.
+
+---
+
+## 🐳 Running Locally
 
 ```powershell
-docker-compose up --build
+docker compose up --build
 ```
-
-Then open:
-
-- [http://localhost:8000/tester](http://localhost:8000/tester)
-
-## Notes
-
-- The backend translates uploaded charts into English for internal extraction, even when the user-facing UI is localized.
-- The served UI now lives in `frontend/` so Docker includes it reliably.
-- Charity matching currently targets oncology and cardiology support paths.
-
-## Build context
-
-Built for ASEAN medical-travel coordination and hackathon-style rapid matching workflows.
+Access the dashboard at [http://localhost:8000/tester](http://localhost:8000/tester).

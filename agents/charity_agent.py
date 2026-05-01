@@ -65,7 +65,9 @@ def _get_collection() -> Optional[chromadb.Collection]:
 # Public API
 # ---------------------------------------------------------------------------
 
-def match_charities(medical_data: Dict, origin_country: str, top_n: int = 3) -> List[Dict]:
+from utils.currency import convert_usd_to, get_conversion_rate
+
+def match_charities(medical_data: Dict, origin_country: str, budget_usd: float = None, estimated_cost_usd: float = None, top_n: int = 3) -> List[Dict]:
     """
     Match patient profile to charity funds using a two-stage pipeline:
       Stage 1: Semantic vector query against ChromaDB charities collection
@@ -77,11 +79,23 @@ def match_charities(medical_data: Dict, origin_country: str, top_n: int = 3) -> 
         medical_data:   dict with at least {'condition': str}.
                         May also contain 'severity', 'urgency' for enriched ranking.
         origin_country: patient's home country e.g. 'Laos', 'Vietnam'
+        budget_usd:     user's budget cap
+        estimated_cost_usd: estimated cost for procedure + travel
         top_n:          max results to return
 
     Returns:
         List of matched fund dicts, country-specific ranked first.
     """
+    
+    # Financial Gap Analysis
+    if budget_usd is not None and estimated_cost_usd is not None:
+        if estimated_cost_usd <= budget_usd:
+            print(f"  [CharityAgent] Estimated cost (${estimated_cost_usd}) is within budget (${budget_usd}). No charity needed.")
+            return []
+        else:
+            gap = estimated_cost_usd - budget_usd
+            print(f"  [CharityAgent] Budget gap detected: ${gap}. Searching for charities...")
+
     condition = medical_data.get("condition", "general medical")
     allowed_area = _condition_area_for_query(condition)
     if allowed_area is None:

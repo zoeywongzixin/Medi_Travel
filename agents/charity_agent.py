@@ -134,6 +134,56 @@ def match_charities(medical_data: Dict, origin_country: str, budget_usd: float =
                                   semantic_ids=semantic_ids, medical_data=medical_data)
 
 
+def calculate_potential_subsidy(
+    hospital: Dict,
+    matched_charities: List[Dict],
+    budget_usd: float,
+    base_medical_cost_usd: float,
+    travel_cost_usd: float,
+) -> Dict:
+    """
+    Convert charity retrieval into a hospital-aware grant estimate.
+    The hospital metadata remains the gatekeeper for whether a subsidy is realistically available.
+    """
+    hospital_metadata = hospital.get("hospital_metadata") or {}
+    availability = hospital_metadata.get("Grant Availability", hospital.get("grant_availability", "Low"))
+    availability_caps = {"High": 500.0, "Medium": 320.0, "Low": 180.0}
+    hospital_cap = float(hospital_metadata.get("grant_cap_usd", availability_caps.get(availability, 150.0)))
+
+    best_charity = matched_charities[0] if matched_charities else None
+    charity_cap = float((best_charity or {}).get("max_coverage_usd", 0) or 0)
+    package_gap = max(0.0, (base_medical_cost_usd + travel_cost_usd) - float(budget_usd or 0))
+
+    if best_charity is None and availability == "Low":
+        return {
+            "grant_availability": availability,
+            "potential_subsidy_usd": 0.0,
+            "grant_reduction_usd": 0.0,
+            "selected_charity": None,
+            "grant_reason": "No matching NGO fund was found for this route and hospital profile.",
+        }
+
+    # Prioritize covering the travel gap first, then the broader budget gap if the fund allows it.
+    desired_support = max(travel_cost_usd, min(package_gap, travel_cost_usd + 250.0))
+    effective_cap = hospital_cap if charity_cap <= 0 else min(hospital_cap, charity_cap)
+    subsidy = round(min(desired_support, effective_cap), 2)
+
+    if subsidy <= 0:
+        reason = "Grant availability exists, but the current package does not need extra subsidy."
+    elif subsidy >= travel_cost_usd:
+        reason = "The projected subsidy is large enough to cover the simulated flight leg."
+    else:
+        reason = "The projected subsidy partially offsets travel and treatment costs."
+
+    return {
+        "grant_availability": availability,
+        "potential_subsidy_usd": subsidy,
+        "grant_reduction_usd": subsidy,
+        "selected_charity": best_charity,
+        "grant_reason": reason,
+    }
+
+
 def get_funds_for_country(country: str) -> List[Dict]:
     """Return all charities that explicitly target a specific country."""
     funds = []

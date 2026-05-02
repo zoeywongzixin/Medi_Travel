@@ -80,7 +80,7 @@ LETTER_SKELETONS = {
     )
 }
 
-VISA_TEMPLATE_KEYS = {"visa_support", "mhtc_visa_support", "official_referral", "smart_itinerary", "charity_memo"}
+VISA_TEMPLATE_KEYS = {"visa_support", "mhtc_visa_support"}
 UNICODE_FONT_CANDIDATES = (
     Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
     Path("C:/Windows/Fonts/arial.ttf"),
@@ -185,9 +185,15 @@ def _format_flight_line(package_data: Optional[Dict[str, Any]], user_data: Dict[
 
 
 def _format_charity_line(package_data: Optional[Dict[str, Any]]) -> str:
-    charity = (package_data or {}).get("charity") or {}
+    pkg = package_data or {}
+    charity = pkg.get("charity") or pkg.get("selected_charity")
+    
+    # Also check inside grant_analysis if passed from some flows
+    if not charity and "grant_analysis" in pkg:
+        charity = pkg["grant_analysis"].get("selected_charity")
+        
     if not charity:
-        return "No charity selected at the time of issuance."
+        return "No financial aid / charity fund is allocated to this package."
 
     name = _clean_text(charity.get("name"), "Selected charity")
     organization = _clean_text(charity.get("organization"), "")
@@ -202,6 +208,7 @@ def _format_charity_line(package_data: Optional[Dict[str, Any]]) -> str:
 
 
 def build_visa_support_content(
+    template_str: str,
     user_data: Optional[Dict[str, Any]] = None,
     medical_data: Optional[Dict[str, Any]] = None,
     package_data: Optional[Dict[str, Any]] = None,
@@ -210,16 +217,16 @@ def build_visa_support_content(
     medical_data = medical_data or {}
     package_data = package_data or {}
 
-    current_date = _clean_text(
-        user_data.get("current_date"),
-        _default_letter_date(),
-    )
-    age_group = _normalize_age_group(medical_data, user_data)
-    diagnosis = _normalize_diagnosis(medical_data, user_data)
+    # Enrich user_data with clinical and itinerary details for the template
+    enrich_user_data_with_package(user_data, medical_data, package_data)
+    
+    current_date = user_data.get("current_date")
+    age_group = user_data.get("age_group")
+    diagnosis = user_data.get("medical_condition")
     urgency_status = _normalize_urgency_status(medical_data)
-    hospital_line = _format_hospital_line(package_data, user_data)
-    flight_line = _format_flight_line(package_data, user_data)
-    charity_line = _format_charity_line(package_data)
+    hospital_line = user_data.get("hospital_details", "")
+    flight_line = user_data.get("flight_details", "")
+    charity_line = user_data.get("charity_details", "")
 
     is_critical = urgency_status == "Critical"
     title = "MEDICAL APPEAL LETTER" if is_critical else "MEDICAL TRAVEL SUPPORT LETTER"
@@ -289,26 +296,49 @@ def build_visa_support_content(
         "Malaysia Medical Match Platform",
     ])
     
-    # Custom dossier parsing
+    # If template_str looks like a key, use the skeleton, otherwise use the string directly
+    final_template = LETTER_SKELETONS.get(template_str, template_str)
+    
+    # If the template contains placeholders like {diagnosis}, {charity_details}, etc.
+    # we fill it using our enriched user_data
+    return fill_template(final_template, user_data)
+
+def enrich_user_data_with_package(user_data: Dict[str, Any], medical_data: Dict[str, Any], package_data: Dict[str, Any]):
+    """Populates user_data with printable strings derived from medical and package data."""
+    current_date = _clean_text(
+        user_data.get("current_date"),
+        _default_letter_date(),
+    )
+    user_data["current_date"] = current_date
+    user_data["age_group"] = _normalize_age_group(medical_data, user_data)
+    user_data["medical_condition"] = _normalize_diagnosis(medical_data, user_data)
+    user_data["diagnosis"] = user_data["medical_condition"]
+    user_data["urgency_status"] = _normalize_urgency_status(medical_data)
+    
+    # Format lines for templates that use {hospital_details}, {flight_details}, etc.
+    user_data["hospital_details"] = _format_hospital_line(package_data, user_data)
+    user_data["flight_details"] = _format_flight_line(package_data, user_data)
+    user_data["charity_details"] = _format_charity_line(package_data)
+    
+    # Map to common template keys
+    user_data["hospital_name"] = _clean_text(((package_data or {}).get("specialist") or {}).get("hospital"), "Selected Hospital")
+    user_data["specialist_name"] = _clean_text(((package_data or {}).get("specialist") or {}).get("name"), "Selected Specialist")
+    
     if package_data and "clinical_summary" in package_data:
         cs = package_data["clinical_summary"]
         user_data["clinical_summary"] = cs.get("professional_summary", "")
         user_data["total_stay_days"] = cs.get("total_stay_days", "")
-    
+        
     if package_data and "travel_dates" in package_data:
         td = package_data["travel_dates"]
         user_data["arrival_date"] = td.get("arrival_date", "")
         user_data["departure_date"] = td.get("departure_date", "")
-        
-    user_data["flight_details"] = flight_line
-    user_data["charity_details"] = charity_line
-    user_data["current_date"] = current_date
-    user_data["specialist_name"] = _clean_text(((package_data or {}).get("specialist") or {}).get("name"), "Specialist")
-    user_data["hospital_name"] = _clean_text(((package_data or {}).get("specialist") or {}).get("hospital"), "Hospital")
-    user_data["patient_name"] = _clean_text(user_data.get("patient_name"), "Patient Name")
-    user_data["patient_passport"] = _clean_text(user_data.get("patient_passport"), "Passport No")
-
-    return content
+    
+    # Default fallbacks for patient info if not provided
+    user_data["patient_name"] = _clean_text(user_data.get("patient_name"), "___________________________")
+    user_data["patient_passport"] = _clean_text(user_data.get("patient_passport"), "_______________________")
+    user_data["escort_name"] = _clean_text(user_data.get("escort_name"), "_________________________")
+    user_data["escort_passport"] = _clean_text(user_data.get("escort_passport"), "_______________________")
 
 def fill_template(template_str: str, user_data: dict) -> str:
     """

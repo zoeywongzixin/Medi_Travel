@@ -7,6 +7,10 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 import shutil
 import uvicorn
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Import utilities
 from utils.ocr_engine import extract_raw_text
@@ -46,14 +50,28 @@ app.add_middleware(
 class MatchRequest(BaseModel):
     medical_data: Dict[str, Any]
     origin_country: str = Field(default="Indonesia", description="Where the patient is flying from")
+    user_origin: Optional[str] = Field(default=None, description="Optional user-origin city override")
     budget_local: float = Field(default=5000.0, description="Patient's maximum budget in local currency")
     currency: str = Field(default="USD", description="Currency of the budget")
     preferred_month: str = Field(default="Next Month", description="User's preferred month for travel")
     preferred_language: str = Field(default="English", description="Target language for outputs")
+    user_priority_preference: str = Field(default="balanced", description="How to rank accessible packages")
+    manual_override: bool = Field(default=False, description="Bypass accessibility reranking and preserve raw semantic hits")
 
 class LayerRequest(BaseModel):
     medical_data: Dict[str, Any]
     origin_country: str = Field(default="Indonesia", description="Where the patient is flying from")
+
+
+def _build_agent_response(packages: list, manual_override: bool) -> Dict[str, Any]:
+    top_package = packages[0] if packages else None
+    return {
+        "retriever_source": "chromadb",
+        "manual_override": manual_override,
+        "total_accessibility_score": (top_package or {}).get("total_accessibility_score", 0),
+        "structured_itinerary": (top_package or {}).get("structured_itinerary"),
+        "antigravity_state": (top_package or {}).get("antigravity_state"),
+    }
 
 class CombinePackageRequest(BaseModel):
     hospital: Dict[str, Any]
@@ -130,20 +148,31 @@ async def match_packages(request: MatchRequest):
     from utils.currency import convert_to_usd
     budget_usd = convert_to_usd(request.budget_local, request.currency)
     
-    # Analyze logistics
-    logistics_data = get_transport_requirements(medical_data, origin=origin, destination="Malaysia")
-    
     # Orchestrate packages (Hospital, Flight, Charity)
-    packages = orchestrate_packages(medical_data, origin, budget_usd, request.currency, preferred_month)
+    packages = orchestrate_packages(
+        medical_data=medical_data,
+        origin_country=origin,
+        budget_usd=budget_usd,
+        currency=request.currency,
+        preferred_month=preferred_month,
+        user_origin=request.user_origin,
+        user_priority_preference=request.user_priority_preference,
+        manual_override=request.manual_override,
+    )
+    logistics_data = packages[0]["flight_logistics"] if packages else get_transport_requirements(medical_data, origin=origin, destination="Malaysia")
     
     # Translate outputs if necessary
     if language.lower() not in ["english", "en"]:
         for p in packages:
+            p["package_type"] = translate_text(p["package_type"], language)
             p["package_reasoning"] = translate_text(p["package_reasoning"], language)
+            if "structured_itinerary" in p and "summary" in p["structured_itinerary"]:
+                p["structured_itinerary"]["summary"] = translate_text(p["structured_itinerary"]["summary"], language)
             if "clinical_summary" in p and "professional_summary" in p["clinical_summary"]:
                 p["clinical_summary"]["professional_summary"] = translate_text(p["clinical_summary"]["professional_summary"], language)
     
     return {
+        "agent_response": _build_agent_response(packages, request.manual_override),
         "logistics": logistics_data,
         "recommended_packages": packages
     }
@@ -229,11 +258,14 @@ async def api_preview_letter(request: GenerateLetterRequest):
     try:
         if request.template_key in VISA_TEMPLATE_KEYS:
             content = build_visa_support_content(
+                template_str=request.template_key,
                 user_data=request.user_data,
                 medical_data=request.medical_data,
                 package_data=request.package_data,
             )
         else:
+            from utils.letter_generator import enrich_user_data_with_package
+            enrich_user_data_with_package(request.user_data, request.medical_data or {}, request.package_data or {})
             content = fill_template(template, request.user_data)
 
         if request.target_language and request.target_language.lower() not in {"english", "en"}:
@@ -254,11 +286,14 @@ async def api_generate_letter(request: GenerateLetterRequest):
     try:
         if request.template_key in VISA_TEMPLATE_KEYS:
             content = build_visa_support_content(
+                template_str=request.template_key,
                 user_data=request.user_data,
                 medical_data=request.medical_data,
                 package_data=request.package_data,
             )
         else:
+            from utils.letter_generator import enrich_user_data_with_package
+            enrich_user_data_with_package(request.user_data, request.medical_data or {}, request.package_data or {})
             content = fill_template(template, request.user_data)
 
         if request.target_language and request.target_language.lower() not in {"english", "en"}:
@@ -281,9 +316,13 @@ async def api_generate_letter(request: GenerateLetterRequest):
 async def full_pipeline(
     file: UploadFile = File(...),
     origin_country: str = Form("Indonesia"),
+    user_origin: Optional[str] = Form(None),
     budget_usd: int = Form(5000),
+    currency: str = Form("USD"),
     preferred_month: str = Form("Next Month"),
-    preferred_language: str = Form("English")
+    preferred_language: str = Form("English"),
+    user_priority_preference: str = Form("balanced"),
+    manual_override: bool = Form(False),
 ):
     """
     Step 3: All-in-One. Upload the chart, enter your country and budget, and instantly get packages.
@@ -304,16 +343,28 @@ async def full_pipeline(
         medical_data = get_concise_json(english_text)
         
         # Match
-        logistics_data = get_transport_requirements(medical_data, origin=origin_country, destination="Malaysia")
-        packages = orchestrate_packages(medical_data, origin_country, budget_usd, preferred_month)
+        packages = orchestrate_packages(
+            medical_data=medical_data,
+            origin_country=origin_country,
+            budget_usd=budget_usd,
+            currency=currency,
+            preferred_month=preferred_month,
+            user_origin=user_origin,
+            user_priority_preference=user_priority_preference,
+            manual_override=manual_override,
+        )
+        logistics_data = packages[0]["flight_logistics"] if packages else get_transport_requirements(medical_data, origin=origin_country, destination="Malaysia")
         
         if preferred_language.lower() not in ["english", "en"]:
             for p in packages:
                 p["package_reasoning"] = translate_text(p["package_reasoning"], preferred_language)
+                if "structured_itinerary" in p and "summary" in p["structured_itinerary"]:
+                    p["structured_itinerary"]["summary"] = translate_text(p["structured_itinerary"]["summary"], preferred_language)
                 if "clinical_summary" in p and "professional_summary" in p["clinical_summary"]:
                     p["clinical_summary"]["professional_summary"] = translate_text(p["clinical_summary"]["professional_summary"], preferred_language)
         
         return {
+            "agent_response": _build_agent_response(packages, manual_override),
             "extracted_medical_data": medical_data,
             "logistics": logistics_data,
             "recommended_packages": packages

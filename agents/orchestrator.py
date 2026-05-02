@@ -1,185 +1,437 @@
 from typing import Dict, List
 import os
-import ollama
-from agents.medical_agent import match_hospitals, generate_clinical_summary
-from agents.flight_agent import get_flight_options
-from agents.charity_agent import match_charities
-from agents.logistics_agent import get_transport_requirements
+import requests
+import json
+
+from agents.charity_agent import calculate_potential_subsidy, match_charities
+from agents.logistics_agent import (
+    get_transport_requirements,
+    resolve_user_origin_city,
+    simulate_route_lookup,
+)
+from agents.medical_agent import generate_clinical_summary, match_hospitals
+from utils.currency import convert_usd_to
 from utils.date_calculator import calculate_travel_dates
+from utils.schemas import AntigravityState, StructuredItinerary, TotalCarePackage, UserPriorityPreference
 
-def _get_flight_price_estimate(logistics_data: Dict) -> float:
-    """Extract rough flight price from logistics data for gap calculation."""
-    options = logistics_data.get("options", [])
-    if not options:
-        return 500.0 # Default fallback
-    
-    price_str = options[0].get("price", "500")
-    try:
-        # Extract numbers
-        import re
-        numbers = re.findall(r'\d+', str(price_str))
-        if numbers:
-            return float("".join(numbers))
-    except Exception:
-        pass
-    return 500.0
 
-def orchestrate_packages(medical_data: Dict, origin_country: str, budget_usd: float, currency: str, preferred_month: str) -> List[Dict]:
+def _dump_model(model):
+    return model.model_dump() if hasattr(model, "model_dump") else model.dict()
+
+
+def _hospital_cost_multiplier(tier: str) -> float:
+    if tier == "Premium Private":
+        return 1.18
+    if tier == "Government / Semi-Gov":
+        return 0.92
+    return 1.0
+
+
+def _tier_bonus(tier: str) -> int:
+    if tier == "Premium Private":
+        return 12
+    if tier == "Government / Semi-Gov":
+        return 8
+    return 10
+
+
+def _build_total_care_package(
+    base_medical_cost: float,
+    grant_reduction: float,
+    travel_cost: float,
+    budget_usd: float,
+) -> TotalCarePackage:
+    net_cost = round(max(0.0, base_medical_cost + travel_cost - grant_reduction), 2)
+    return TotalCarePackage(
+        base_medical_cost=round(base_medical_cost, 2),
+        grant_reduction=round(grant_reduction, 2),
+        travel_cost=round(travel_cost, 2),
+        net_cost=net_cost,
+        within_budget=net_cost <= float(budget_usd or 0),
+    )
+
+
+def _compute_accessibility_score(
+    hospital: Dict,
+    total_care_package: Dict,
+    route: Dict,
+    subsidy: Dict,
+    budget_usd: float,
+) -> int:
+    net_cost = total_care_package["net_cost"]
+    budget_gap = max(0.0, net_cost - float(budget_usd or 0))
+    budget_score = 100.0 if budget_gap == 0 else max(5.0, 100.0 - (budget_gap / max(float(budget_usd or 1), 1.0)) * 100.0)
+
+    travel_cost = float(route.get("travel_cost_usd", 0.0))
+    travel_duration = float(route.get("travel_duration_hours", 0.0))
+    travel_score = max(25.0, 100.0 - max(0.0, travel_cost - 90.0) * 0.25 - max(0.0, travel_duration - 1.5) * 16.0)
+
+    grant_value = float(subsidy.get("potential_subsidy_usd", 0.0))
+    grant_score = min(100.0, (grant_value / max(travel_cost, 1.0)) * 70.0 + (grant_value / max(total_care_package["base_medical_cost"], 1.0)) * 30.0)
+
+    baseline_clinical = hospital.get("match_score")
+    if baseline_clinical is None:
+        baseline_clinical = max(55, 90 - ((hospital.get("semantic_rank", 1) - 1) * 10))
+    clinical_score = min(100.0, float(baseline_clinical) + _tier_bonus(hospital.get("tier")))
+
+    overall = (budget_score * 0.42) + (travel_score * 0.23) + (grant_score * 0.2) + (clinical_score * 0.15)
+    return int(round(min(100.0, max(1.0, overall))))
+
+
+def _build_package_label(index: int, preference: str, manual_override: bool) -> str:
+    if manual_override:
+        return f"Semantic Match {index}"
+
+    if index == 1:
+        labels = {
+            "balanced": "Best Overall",
+            "lowest_net_cost": "Most Affordable",
+            "fastest_access": "Fastest Access",
+            "clinical_quality": "Clinical Priority",
+        }
+        return labels.get(preference, "Best Overall")
+    return f"Alternative {index}"
+
+
+def _generate_reasoning_with_gemini(hospital, route, total_care_package, subsidy):
+    # Try both possible env var names
+    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        return None
+
+    hospital_name = hospital.get("hospital", "the hospital")
+    specialty = hospital.get("specialty", "the medical condition")
+    net_cost = total_care_package["net_cost"]
+    grant_amount = float(subsidy.get("potential_subsidy_usd", 0.0))
+    grant_name = (subsidy.get("selected_charity") or {}).get("name") or "a charity grant"
+    origin_city = route.get("origin_city", "your home city")
+    travel_duration = route.get("travel_duration_hours", 0)
+
+    prompt = f"""
+    You are 'Antigravity', an empathetic AI medical travel coordinator. 
+    Explain why this specific medical package is a great match for a patient with the following details:
+    - Hospital: {hospital_name} (Specialty: {specialty})
+    - Travel: From {origin_city} (Approx. {travel_duration} hours)
+    - Financials: Net cost ${net_cost:,.2f} USD (Includes a ${grant_amount:,.2f} grant from {grant_name})
+
+    The user is a layman and might be feeling anxious about medical travel. 
+    Your goal is to provide a 'solid reason' why this package was chosen.
+    Focus on:
+    1. Clinical expertise: Why this specific hospital/specialist is trustable for {specialty}.
+    2. Financial relief: How the ${grant_amount} subsidy helps them specifically.
+    3. Logistics: Why this travel route from {origin_city} makes sense.
+
+    Guidelines:
+    - Start with a warm, reassuring tone.
+    - Use clear, non-medical language.
+    - Explain 'Why this match?' in a way that proves the Antigravity agent has deeply processed their request.
+    - Keep it between 40-70 words.
+    - Do NOT use markdown bolding or quotes.
     """
-    Combines layers 1, 2, and 3 to create holistic medical travel packages.
-    Generates 3 distinct packages: Elite, Optimized (Budget), and Proximity.
+
+    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key={api_key}"
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}]
+    }
+    
+    # Simple retry loop for robustness in flaky network environments (like Docker)
+    for attempt in range(2):
+        try:
+            response = requests.post(url, json=payload, timeout=30)
+            if response.status_code == 200:
+                data = response.json()
+                reasoning = data['candidates'][0]['content']['parts'][0]['text'].strip()
+                # Clean up potential markdown or quotes
+                return reasoning.replace("**", "").replace("\"", "")
+            else:
+                print(f"Gemini Error (Attempt {attempt+1}): {response.status_code} - {response.text}")
+        except Exception as e:
+            print(f"Gemini Exception (Attempt {attempt+1}): {e}")
+        
+        if attempt == 0:
+            import time
+            time.sleep(1) # Wait a bit before retrying
+    
+    return None
+
+
+def _build_structured_itinerary(
+    hospital: Dict,
+    route: Dict,
+    total_care_package: Dict,
+    subsidy: Dict,
+    accessibility_score: int,
+) -> Dict:
+    hospital_name = hospital.get("hospital", "the matched hospital")
+    origin_city = route.get("origin_city", "your city")
+    destination_city = route.get("destination_city", "Malaysia")
+    grant_amount = float(subsidy.get("potential_subsidy_usd", 0.0))
+    grant_name = (subsidy.get("selected_charity") or {}).get("name") or "NGO subsidy"
+    travel_cost = float(route.get("travel_cost_usd", 0.0))
+    net_cost = total_care_package["net_cost"]
+
+    # Try Gemini first for a "solid reason"
+    summary = _generate_reasoning_with_gemini(hospital, route, total_care_package, subsidy)
+    
+    if not summary:
+        specialty = hospital.get("specialty", "this condition")
+        if grant_amount >= travel_cost and grant_amount > 0:
+            summary = (
+                f"Why this match? Our AI Agent carefully analyzed your medical data and specifically selected {hospital_name} because their specialists have verified expertise in {specialty}. "
+                f"Furthermore, recognizing your budget constraints, our Financial Agent actively secured a ${grant_amount:,.0f} subsidy from {grant_name}. "
+                f"This completely covers your flight from {origin_city}, bringing your total out-of-pocket estimated cost down to a manageable ${net_cost:,.0f}."
+            )
+        elif grant_amount > 0:
+            summary = (
+                f"Why this match? Our AI Agent carefully analyzed your medical data and specifically selected {hospital_name} because of their top-tier clinical team for {specialty}. "
+                f"To further assist you, our Financial Agent identified a ${grant_amount:,.0f} subsidy from {grant_name} to help pay "
+                f"for your trip from {origin_city}. This makes your total estimated cost around ${net_cost:,.0f}."
+            )
+        else:
+            summary = (
+                f"Why this match? Our AI Agent carefully analyzed your medical data and matched you with {hospital_name} due to their renowned expertise in treating {specialty}. "
+                f"Our Logistics Agent also calculated a highly convenient {route.get('travel_duration_hours', 0):.1f}-hour journey from {origin_city}. "
+                f"This keeps the total estimated cost of your treatment and travel around ${net_cost:,.0f}, perfectly balancing clinical quality with accessibility."
+            )
+
+    itinerary = StructuredItinerary(
+        headline=f"Accessibility score {accessibility_score}/100 for {hospital_name}",
+        summary=summary,
+        origin_city=origin_city,
+        destination_city=destination_city,
+        destination_hospital=hospital_name,
+        travel_mode=route.get("travel_mode", "Commercial Flight"),
+        travel_duration_hours=float(route.get("travel_duration_hours", 0.0)),
+        travel_cost_usd=travel_cost,
+        grant_name=None if grant_amount <= 0 else grant_name,
+        grant_amount_usd=grant_amount,
+    )
+    return _dump_model(itinerary)
+
+
+def _sort_packages(packages: List[Dict], preference: str, manual_override: bool) -> List[Dict]:
+    if manual_override:
+        return packages
+
+    if preference == "lowest_net_cost":
+        key_fn = lambda pkg: (
+            pkg["total_care_package"]["net_cost"],
+            -pkg["total_accessibility_score"],
+            pkg["flight"]["travel_duration_hours"],
+        )
+    elif preference == "fastest_access":
+        key_fn = lambda pkg: (
+            pkg["flight"]["travel_duration_hours"],
+            pkg["total_care_package"]["net_cost"],
+            -pkg["total_accessibility_score"],
+        )
+    elif preference == "clinical_quality":
+        key_fn = lambda pkg: (
+            -(pkg["specialist"].get("match_score", max(55, 90 - ((pkg["specialist"].get("semantic_rank", 1) - 1) * 10))) + _tier_bonus(pkg["specialist"].get("tier"))),
+            pkg["total_care_package"]["net_cost"],
+            pkg["flight"]["travel_duration_hours"],
+        )
+    else:
+        key_fn = lambda pkg: (
+            -pkg["total_accessibility_score"],
+            pkg["total_care_package"]["net_cost"],
+            pkg["flight"]["travel_duration_hours"],
+        )
+
+    return sorted(packages, key=key_fn)
+
+
+def orchestrate_packages(
+    medical_data: Dict,
+    origin_country: str,
+    budget_usd: float,
+    currency: str = "USD",
+    preferred_month: str = "Next Month",
+    user_origin: str = None,
+    user_priority_preference: str = "balanced",
+    manual_override: bool = False,
+) -> List[Dict]:
     """
-    from utils.currency import convert_usd_to
-    import copy
-    print(f"\n--- 🚀 Starting Lead Orchestrator for {origin_country} ---")
-    
-    # ---------------------------------------------------------
-    # PHASE 1: Parallel Agent Delegation
-    # ---------------------------------------------------------
-    
-    # Clinical Agent
-    print("[Orchestrator] Clinical Agent: Estimating duration and generating summary...")
+    ChromaDB remains the source of truth for hospital retrieval.
+    This orchestrator wraps those hits with logistics, charity, scoring, and itinerary metadata.
+    """
+    print(f"\n--- Starting Antigravity Orchestrator for {origin_country} ---")
+
+    retrieval_mode = "semantic_raw" if manual_override else "default"
+    normalized_origin = user_origin or origin_country
+    resolved_origin_city = resolve_user_origin_city(normalized_origin)
+
     clinical_summary = generate_clinical_summary(medical_data)
-    hospitals = match_hospitals(medical_data)
-    
+    hospitals = match_hospitals(medical_data, retrieval_mode=retrieval_mode, top_n=3)
     if not hospitals:
         return []
 
-    # Logistics Agent
-    print("[Orchestrator] Logistics Agent: Calculating dates and transport...")
     travel_dates = calculate_travel_dates(preferred_month, clinical_summary["total_stay_days"])
-    transport_reqs = get_transport_requirements(medical_data, origin=origin_country, destination="Malaysia")
-    logistics = get_flight_options(transport_reqs, origin_country)
-    
-    # Financial Agent
-    print("[Orchestrator] Financial Agent: Comparing budget and identifying charities...")
-    flight_estimate = _get_flight_price_estimate(logistics)
-    total_estimated_cost = clinical_summary["estimated_cost_usd"] + flight_estimate
-    
+    transport_requirements = get_transport_requirements(medical_data, origin=resolved_origin_city, destination="Malaysia")
+    route_cache = {
+        hospital.get("id", hospital.get("hospital", f"route_{index}")): simulate_route_lookup(
+            hospital.get("hospital_location", hospital.get("hospital", "")),
+            normalized_origin,
+        )
+        for index, hospital in enumerate(hospitals, start=1)
+    }
+    representative_travel_cost = min(
+        (route.get("travel_cost_usd", 0.0) for route in route_cache.values()),
+        default=0.0,
+    )
     charities = match_charities(
-        medical_data, 
-        origin_country, 
-        budget_usd=budget_usd, 
-        estimated_cost_usd=total_estimated_cost
+        medical_data,
+        origin_country,
+        budget_usd=budget_usd,
+        estimated_cost_usd=clinical_summary["estimated_cost_usd"] + representative_travel_cost,
     )
 
-    # ---------------------------------------------------------
-    # PHASE 2: Output Generation (The 3 Packages)
-    # ---------------------------------------------------------
-    print(f"[Orchestrator] Generating packages with currency: {currency}")
-    print(f"[Orchestrator] Base clinical cost: ${clinical_summary['estimated_cost_usd']}")
-    packages = []
-    
-    # Package 1: The Elite
-    # Best-in-class hospital (index 0), most direct logistics
-    elite_hospital = hospitals[0] if len(hospitals) > 0 else None
-    if elite_hospital:
-        elite_summary = copy.deepcopy(clinical_summary)
-        base_cost = elite_summary["estimated_cost_usd"]
-        elite_cost_usd = base_cost * 1.5
-        elite_cost_local = convert_usd_to(elite_cost_usd, currency)
-        elite_summary["estimated_cost_usd"] = elite_cost_usd
-        elite_summary["estimated_cost_local"] = elite_cost_local
-        elite_summary["estimated_cost_formatted"] = f"${elite_cost_usd:,.0f} USD ({currency} {elite_cost_local:,.0f})"
-        print(f"  - Elite cost: {elite_summary['estimated_cost_formatted']}")
-        
-        packages.append({
-            "package_id": "PKG_ELITE",
-            "package_type": "The Elite",
-            "package_reasoning": "Best-in-class hospital matched with the most direct logistics for premium care.",
-            "specialist": elite_hospital,
-            "flight_logistics": logistics,
-            "travel_dates": travel_dates,
-            "clinical_summary": elite_summary,
-            "charity": None
-        })
+    packages: List[Dict] = []
+    for hospital in hospitals:
+        route = route_cache[hospital.get("id", hospital.get("hospital"))]
+        adjusted_base_cost = round(clinical_summary["estimated_cost_usd"] * _hospital_cost_multiplier(hospital.get("tier")), 2)
+        subsidy = calculate_potential_subsidy(
+            hospital=hospital,
+            matched_charities=charities,
+            budget_usd=budget_usd,
+            base_medical_cost_usd=adjusted_base_cost,
+            travel_cost_usd=route["travel_cost_usd"],
+        )
 
-    # Package 2: The Optimized (Budget)
-    # Solid hospital + Charity Subsidy
-    budget_hospital = hospitals[1] if len(hospitals) > 1 else elite_hospital
-    if budget_hospital:
-        opt_summary = copy.deepcopy(clinical_summary)
-        base_cost = opt_summary["estimated_cost_usd"]
-        opt_cost_usd = base_cost * 1.0
-        opt_cost_local = convert_usd_to(opt_cost_usd, currency)
-        opt_summary["estimated_cost_usd"] = opt_cost_usd
-        opt_summary["estimated_cost_local"] = opt_cost_local
-        opt_summary["estimated_cost_formatted"] = f"${opt_cost_usd:,.0f} USD ({currency} {opt_cost_local:,.0f})"
-        
-        packages.append({
-            "package_id": "PKG_OPTIMIZED",
-            "package_type": "The Optimized",
-            "package_reasoning": "A solid hospital choice paired with a specific identified Charity Subsidy to stay under budget.",
-            "specialist": budget_hospital,
-            "flight_logistics": logistics,
-            "travel_dates": travel_dates,
-            "clinical_summary": opt_summary,
-            "charity": charities[0] if charities else None
-        })
+        total_care_package = _dump_model(
+            _build_total_care_package(
+                base_medical_cost=adjusted_base_cost,
+                grant_reduction=subsidy["grant_reduction_usd"],
+                travel_cost=route["travel_cost_usd"],
+                budget_usd=budget_usd,
+            )
+        )
+        total_care_package["net_cost_local"] = round(convert_usd_to(total_care_package["net_cost"], currency), 2)
+        total_care_package["net_cost_formatted"] = f"${total_care_package['net_cost']:,.0f} USD ({currency} {total_care_package['net_cost_local']:,.0f})"
 
-    # Package 3: The Proximity
-    # Most logistically convenient (could use third hospital or specific logistics logic)
-    proximity_hospital = hospitals[2] if len(hospitals) > 2 else budget_hospital
-    if proximity_hospital:
-        prox_summary = copy.deepcopy(clinical_summary)
-        base_cost = prox_summary["estimated_cost_usd"]
-        prox_cost_usd = base_cost * 1.15
-        prox_cost_local = convert_usd_to(prox_cost_usd, currency)
-        prox_summary["estimated_cost_usd"] = prox_cost_usd
-        prox_summary["estimated_cost_local"] = prox_cost_local
-        prox_summary["estimated_cost_formatted"] = f"${prox_cost_usd:,.0f} USD ({currency} {prox_cost_local:,.0f})"
-        
-        packages.append({
-            "package_id": "PKG_PROXIMITY",
-            "package_type": "The Proximity",
-            "package_reasoning": "The most logistically convenient option optimized for ease of travel and access.",
-            "specialist": proximity_hospital,
-            "flight_logistics": logistics,
-            "travel_dates": travel_dates,
-            "clinical_summary": prox_summary,
-            "charity": None
-        })
+        package_clinical_summary = dict(clinical_summary)
+        package_clinical_summary["estimated_cost_usd"] = adjusted_base_cost
+        package_clinical_summary["estimated_cost_local"] = round(convert_usd_to(adjusted_base_cost, currency), 2)
+        package_clinical_summary["estimated_cost_formatted"] = (
+            f"${adjusted_base_cost:,.0f} USD ({currency} {package_clinical_summary['estimated_cost_local']:,.0f})"
+        )
 
-    print("--- ✅ Orchestration Complete ---\n")
+        package_logistics = {
+            **transport_requirements,
+            "route_estimate": route,
+        }
+
+        accessibility_score = _compute_accessibility_score(
+            hospital=hospital,
+            total_care_package=total_care_package,
+            route=route,
+            subsidy=subsidy,
+            budget_usd=budget_usd,
+        )
+        structured_itinerary = _build_structured_itinerary(
+            hospital=hospital,
+            route=route,
+            total_care_package=total_care_package,
+            subsidy=subsidy,
+            accessibility_score=accessibility_score,
+        )
+
+        preference_state = UserPriorityPreference(mode=user_priority_preference, manual_override=manual_override)
+        antigravity_state = AntigravityState(
+            retrieval_strategy="raw_semantic" if manual_override else "financial_reranker",
+            user_origin=resolved_origin_city,
+            hospital_location=hospital.get("hospital_location", "Malaysia"),
+            user_priority_preference=preference_state,
+            total_care_package=TotalCarePackage(**{
+                key: total_care_package[key]
+                for key in ("base_medical_cost", "grant_reduction", "travel_cost", "net_cost", "within_budget")
+            }),
+            logistics=package_logistics,
+            charity=subsidy.get("selected_charity"),
+        )
+
+        package_reasoning = structured_itinerary["summary"]
+        if manual_override:
+            package_reasoning += " Note: Manual Override is active. This result reflects the raw clinical search order from our database without secondary financial reranking."
+
+        packages.append(
+            {
+                "package_id": f"PKG_{hospital.get('id', hospital.get('hospital', 'MATCH')).replace('-', '_')}",
+                "package_type": "",
+                "package_reasoning": package_reasoning,
+                "specialist": hospital,
+                "flight": route,
+                "flight_logistics": package_logistics,
+                "travel_dates": travel_dates,
+                "clinical_summary": package_clinical_summary,
+                "charity": subsidy.get("selected_charity"),
+                "grant_analysis": subsidy,
+                "total_care_package": total_care_package,
+                "total_accessibility_score": accessibility_score,
+                "structured_itinerary": structured_itinerary,
+                "antigravity_state": _dump_model(antigravity_state),
+            }
+        )
+
+    packages = _sort_packages(packages, user_priority_preference, manual_override)
+    for index, package in enumerate(packages, start=1):
+        package["package_type"] = _build_package_label(index, user_priority_preference, manual_override)
+
+    print("--- Orchestration complete ---\n")
     return packages
 
-def generate_single_package(hospital: Dict, logistics_data: Dict, flight: Dict, charity: Dict, origin_country: str, budget_usd: int, travel_dates: dict, clinical_summary: dict) -> Dict:
+
+def generate_single_package(
+    hospital: Dict,
+    logistics_data: Dict,
+    flight: Dict,
+    charity: Dict,
+    origin_country: str,
+    budget_usd: int,
+    travel_dates: dict = None,
+    clinical_summary: dict = None,
+) -> Dict:
     """
-    Generates a single personalized package from user-selected components.
+    Build a final package payload for a user-selected itinerary.
     """
-    charity_text = f"Charities: {charity['name']}" if charity else "No specific charities"
-    transport_method = logistics_data.get('recommendation', 'Flight')
-    flight_details = f"{flight.get('airline', 'Flight')} - {flight.get('price', 'Unknown price')}" if flight else "No flight selected"
-    
-    prompt = (
-        f"Context: Travel coordination for an international visitor to Malaysia.\n"
-        f"Destination: {hospital.get('hospital', 'Unknown Hospital')}. Origin: {origin_country}. Budget: ${budget_usd} USD.\n"
-        f"Specialist: {hospital.get('name')} ({hospital.get('specialty')})\n"
-        f"Transport: {transport_method}. Selected Flight: {flight_details}\n"
-        f"- {charity_text}\n\n"
-        f"Write two sentences for a travel brochure highlighting why this coordination of hospital reputation and logistics is a great value option."
+    route = flight or logistics_data.get("route_estimate") or simulate_route_lookup(
+        hospital.get("hospital_location", hospital.get("hospital", "")),
+        origin_country,
     )
-    
-    try:
-        ollama_host = os.getenv("OLLAMA_HOST", "http://ollama:11434")
-        client = ollama.Client(host=ollama_host)
-        response = client.chat(
-            model='llama3.2:3b',
-            messages=[{'role': 'user', 'content': prompt}],
-            options={'temperature': 0.2, 'num_ctx': 800}
+    clinical_summary = clinical_summary or generate_clinical_summary({"condition": hospital.get("specialty", "General Medicine")})
+    base_cost = float(clinical_summary.get("estimated_cost_usd", 0.0))
+
+    matched_charities = [charity] if charity else []
+    subsidy = calculate_potential_subsidy(
+        hospital=hospital,
+        matched_charities=matched_charities,
+        budget_usd=budget_usd,
+        base_medical_cost_usd=base_cost,
+        travel_cost_usd=float(route.get("travel_cost_usd", 0.0)),
+    )
+    total_care_package = _dump_model(
+        _build_total_care_package(
+            base_medical_cost=base_cost,
+            grant_reduction=subsidy["grant_reduction_usd"],
+            travel_cost=float(route.get("travel_cost_usd", 0.0)),
+            budget_usd=budget_usd,
         )
-        package_reasoning = response.message.content.strip()
-    except Exception as e:
-        print(f"  [!] Package reasoning failed: {e}")
-        package_reasoning = "This package combines top medical care, suitable logistics, and available financial aid."
-        
+    )
+    score = _compute_accessibility_score(hospital, total_care_package, route, subsidy, budget_usd)
+    structured_itinerary = _build_structured_itinerary(hospital, route, total_care_package, subsidy, score)
+
     return {
         "package_id": "PKG_CUSTOM",
-        "package_reasoning": package_reasoning,
+        "package_type": "User Selected",
+        "package_reasoning": structured_itinerary["summary"],
         "specialist": hospital,
+        "flight": route,
         "flight_logistics": logistics_data,
-        "selected_flight": flight,
-        "recommended_charity": charity,
-        "travel_dates": travel_dates,
-        "clinical_summary": clinical_summary
+        "charity": subsidy.get("selected_charity"),
+        "grant_analysis": subsidy,
+        "travel_dates": travel_dates or {},
+        "clinical_summary": clinical_summary,
+        "total_care_package": total_care_package,
+        "total_accessibility_score": score,
+        "structured_itinerary": structured_itinerary,
     }

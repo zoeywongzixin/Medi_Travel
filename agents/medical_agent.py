@@ -44,6 +44,56 @@ def _hard_group_gate(candidates: List[Dict], required_groups: Set[str]) -> List[
     ]
     return filtered if filtered else candidates
 
+
+def _infer_hospital_location(hospital_name: str) -> str:
+    hospital = (hospital_name or "").lower()
+    if "penang" in hospital or "adventist" in hospital:
+        return "Penang, Malaysia"
+    if "johor" in hospital:
+        return "Johor Bahru, Malaysia"
+    if "malacca" in hospital or "melaka" in hospital:
+        return "Malacca, Malaysia"
+    if "sabah" in hospital:
+        return "Kota Kinabalu, Malaysia"
+    return "Kuala Lumpur, Malaysia"
+
+
+def _grant_metadata(hospital_name: str, tier: str) -> Dict:
+    hospital = (hospital_name or "").lower()
+    if "penang adventist" in hospital:
+        return {"Grant Availability": "High", "grant_cap_usd": 450}
+    if "sunway" in hospital:
+        return {"Grant Availability": "Medium", "grant_cap_usd": 320}
+    if "gleneagles" in hospital:
+        return {"Grant Availability": "Low", "grant_cap_usd": 180}
+
+    if tier == "Government / Semi-Gov":
+        return {"Grant Availability": "High", "grant_cap_usd": 500}
+    if tier == "Standard Private":
+        return {"Grant Availability": "Medium", "grant_cap_usd": 275}
+    return {"Grant Availability": "Low", "grant_cap_usd": 150}
+
+
+def _build_candidate(doc_id: str, meta: Dict, doc_text: str, semantic_rank: int = None) -> Dict:
+    grant_meta = _grant_metadata(meta.get("hospital"), meta.get("tier"))
+    candidate = {
+        "id": doc_id,
+        "name": meta.get("name"),
+        "hospital": meta.get("hospital"),
+        "specialty": meta.get("specialty"),
+        "specialty_tags": meta.get("specialty_tags"),
+        "tier": meta.get("tier"),
+        "full_registration_number": meta.get("full_registration_number"),
+        "mmc_url": meta.get("mmc_url"),
+        "rag_summary": doc_text,
+        "hospital_location": _infer_hospital_location(meta.get("hospital")),
+        "grant_availability": grant_meta["Grant Availability"],
+        "hospital_metadata": grant_meta,
+    }
+    if semantic_rank is not None:
+        candidate["semantic_rank"] = semantic_rank
+    return candidate
+
 def rank_doctor_matches(medical_data: Dict, candidates: List[Dict], limit: int = 5) -> List[Dict]:
     profile = build_case_profile(medical_data)
     severity = profile.get("severity", "Unknown")
@@ -80,7 +130,7 @@ def rank_doctor_matches(medical_data: Dict, candidates: List[Dict], limit: int =
 # Public API
 # ---------------------------------------------------------------------------
 
-def match_hospitals(medical_data: Dict) -> List[Dict]:
+def match_hospitals(medical_data: Dict, retrieval_mode: str = "default", top_n: int = 3) -> List[Dict]:
     profile = build_case_profile(medical_data)
     condition = profile["condition"] or "General Medicine"
     
@@ -93,7 +143,7 @@ def match_hospitals(medical_data: Dict) -> List[Dict]:
         collection = client.get_collection(name="malaysia_doctors")
     except Exception:
         print("  [!] Warning: 'malaysia_doctors' collection not found.")
-        return get_mock_hospitals()
+        return get_mock_hospitals()[:top_n]
 
     # Stage 1a: Semantic Search
     print("  [MedicalAgent] Stage 1a: Running Semantic Search...")
@@ -129,17 +179,22 @@ def match_hospitals(medical_data: Dict) -> List[Dict]:
     fused_ids = sorted(rrf_scores, key=lambda x: rrf_scores[x], reverse=True)
 
     id_to_data = {doc_id: {"meta": m, "doc": d} for doc_id, m, d in zip(all_ids, all_metas, all_docs)}
+
+    if retrieval_mode == "semantic_raw":
+        raw_hits: List[Dict] = []
+        for rank, doc_id in enumerate(all_ids[:top_n], start=1):
+            data = id_to_data.get(doc_id)
+            if not data:
+                continue
+            raw_hits.append(_build_candidate(doc_id, data["meta"], data["doc"], semantic_rank=rank))
+        return raw_hits or get_mock_hospitals()[:top_n]
+
     candidates = []
     for doc_id in fused_ids:
         data = id_to_data.get(doc_id)
         if not data: continue
         meta, doc_text = data["meta"], data["doc"]
-        candidates.append({
-            "id": doc_id, "name": meta.get("name"), "hospital": meta.get("hospital"),
-            "specialty": meta.get("specialty"), "specialty_tags": meta.get("specialty_tags"),
-            "tier": meta.get("tier"), "full_registration_number": meta.get("full_registration_number"),
-            "mmc_url": meta.get("mmc_url"), "rag_summary": doc_text,
-        })
+        candidates.append(_build_candidate(doc_id, meta, doc_text))
 
     # -----------------------------------------------------------------------
     # Stage 2 & 3: Filtering and Scoring
@@ -158,10 +213,10 @@ def match_hospitals(medical_data: Dict) -> List[Dict]:
     print("  [MedicalAgent] Stage 4: Initiating LLM Rerank (Ollama)...")
     try:
         from agents.rerank_agent import llm_rerank
-        return llm_rerank(top5, medical_data)
+        return llm_rerank(top5, medical_data)[:top_n]
     except Exception as exc:
         print(f"  [!] LLM rerank failed: {exc}")
-        return top5[:3]
+        return top5[:top_n]
 
 def get_mock_hospitals():
     return [
@@ -170,21 +225,30 @@ def get_mock_hospitals():
             'hospital': 'Gleneagles Kuala Lumpur',
             'specialty': 'Orthopedics',
             'specialty_tags': 'Knee Replacement',
-            'tier': 'Premium Private'
+            'tier': 'Premium Private',
+            'hospital_location': 'Kuala Lumpur, Malaysia',
+            'grant_availability': 'Low',
+            'hospital_metadata': {'Grant Availability': 'Low', 'grant_cap_usd': 180},
         },
         {
             'name': 'Dr. Mock Optimized',
             'hospital': 'Sunway Medical Centre',
             'specialty': 'Orthopedics',
             'specialty_tags': 'Knee Replacement',
-            'tier': 'Standard Private'
+            'tier': 'Standard Private',
+            'hospital_location': 'Kuala Lumpur, Malaysia',
+            'grant_availability': 'Medium',
+            'hospital_metadata': {'Grant Availability': 'Medium', 'grant_cap_usd': 320},
         },
         {
             'name': 'Dr. Mock Proximity',
             'hospital': 'Penang Adventist Hospital',
             'specialty': 'Orthopedics',
             'specialty_tags': 'Knee Replacement',
-            'tier': 'Standard Private'
+            'tier': 'Standard Private',
+            'hospital_location': 'Penang, Malaysia',
+            'grant_availability': 'High',
+            'hospital_metadata': {'Grant Availability': 'High', 'grant_cap_usd': 450},
         }
     ]
 

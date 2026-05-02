@@ -16,6 +16,8 @@ FALLBACK_RATES = {
     "PHP": 56.0
 }
 
+_rate_cache = {}
+
 def get_conversion_rate(target_currency: str, base_currency: str = "USD") -> float:
     """
     Gets the conversion rate from base_currency to target_currency.
@@ -24,16 +26,22 @@ def get_conversion_rate(target_currency: str, base_currency: str = "USD") -> flo
     if target_currency == base_currency:
         return 1.0
 
+    cache_key = f"{base_currency}_{target_currency}"
+    if cache_key in _rate_cache:
+        return _rate_cache[cache_key]
+
     if CURRENCY_FREAKS_API_KEY:
         try:
             url = f"https://api.currencyfreaks.com/v2.0/rates/latest?apikey={CURRENCY_FREAKS_API_KEY}&symbols={target_currency}&base={base_currency}"
-            response = requests.get(url, timeout=5)
+            response = requests.get(url, timeout=15)
             if response.status_code == 200:
                 data = response.json()
                 if "rates" in data and target_currency in data["rates"]:
-                    return float(data["rates"][target_currency])
+                    rate = float(data["rates"][target_currency])
+                    _rate_cache[cache_key] = rate
+                    return rate
         except Exception as e:
-            print(f"CurrencyFreaks Error: {e}")
+            print(f"CurrencyFreaks Error (Timed out or failed): {e}")
             pass
             
     # Fallback logic

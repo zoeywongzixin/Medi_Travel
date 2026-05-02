@@ -337,6 +337,39 @@
             50% { opacity: 1; transform: scale(1); }
         }
 
+        .ai-thinking {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--primary);
+            font-weight: 700;
+            animation: pulse-glow 1.5s infinite;
+        }
+
+        .ai-reasoning-box {
+            margin-top: 12px;
+            padding: 10px;
+            background: rgba(15, 123, 108, 0.05);
+            border-left: 3px solid var(--primary);
+            border-radius: 4px;
+            font-size: 0.88rem;
+        }
+
+        .ai-reasoning-label {
+            display: block;
+            font-weight: 700;
+            color: var(--primary);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 4px;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { opacity: 0.7; text-shadow: 0 0 5px rgba(15, 123, 108, 0.2); }
+            50% { opacity: 1; text-shadow: 0 0 12px rgba(15, 123, 108, 0.6); }
+        }
+
         .details {
             margin-top: 18px;
         }
@@ -361,6 +394,23 @@
 
         .section-stack > * + * {
             margin-top: 16px;
+        }
+
+        .override-mode {
+            border-color: #64748b;
+            background: rgba(100, 116, 139, 0.02);
+        }
+
+        .override-badge {
+            display: inline-block;
+            background: #64748b;
+            color: white;
+            font-size: 0.65rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            font-weight: 800;
+            margin-bottom: 8px;
         }
 
         .muted {
@@ -401,6 +451,8 @@
             margin: 20px 0;
             font-family: serif;
             border: 1px solid #ccc;
+            white-space: pre-wrap;
+            line-height: 1.5;
         }
 
         @media (max-width: 720px) {
@@ -465,6 +517,22 @@
                             <option value="Khmer">Khmer</option>
                             <option value="Lao">Lao</option>
                         </select>
+                    </div>
+                    <div class="field">
+                        <label for="user_priority_preference">Match priority</label>
+                        <select id="user_priority_preference">
+                            <option value="balanced">Balanced</option>
+                            <option value="lowest_net_cost">Lowest net cost</option>
+                            <option value="fastest_access">Fastest access</option>
+                            <option value="clinical_quality">Clinical quality</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="manual_override_toggle">Manual Override</label>
+                        <label style="display:flex; align-items:center; gap:10px; font-weight:600;">
+                            <input type="checkbox" id="manual_override_toggle">
+                            <span>Bypass financial reranking and show raw ChromaDB semantic hits</span>
+                        </label>
                     </div>
                 </div>
 
@@ -572,6 +640,19 @@
                 <div class="info-card">
                     <div class="info-label" id="recommendationLabel">Recommendation</div>
                     <div class="info-value" id="packageReasoning"></div>
+                </div>
+
+                <div class="final-grid" style="margin-top: 16px;">
+                    <div class="info-card">
+                        <div class="info-label">Total Accessibility Score</div>
+                        <div class="info-value" id="finalAccessibilityScore">-</div>
+                        <div class="option-detail" id="finalNetCost"></div>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-label">Structured Itinerary</div>
+                        <div class="info-value" id="finalItineraryHeadline">-</div>
+                        <div class="option-detail" id="finalItinerarySummary"></div>
+                    </div>
                 </div>
 
                 <div class="final-grid" style="margin-top: 16px;">
@@ -1243,7 +1324,8 @@
         const selections = {
             hospital: null,
             flight: null,
-            charity: null
+            charity: null,
+            package: null
         };
 
         const byId = (id) => document.getElementById(id);
@@ -1383,6 +1465,11 @@
             return map[value] || value || '-';
         }
 
+        function formatUsd(value) {
+            const numeric = Number(value || 0);
+            return `$${numeric.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+        }
+
         async function translateDynamicText(text) {
             if (!text || !currentCountry || currentCountry.targetLanguage === 'English') {
                 return text;
@@ -1419,13 +1506,9 @@
             selections.hospital = null;
             selections.flight = null;
             selections.charity = null;
-            ['hospitalList', 'flightList', 'charityList'].forEach((id) => {
-                const node = byId(id);
-                if (node) {
-                    node.innerHTML = '';
-                    node.dataset.emptyState = 'false';
-                }
-            });
+            selections.package = null;
+            const grid = byId('packageGrid');
+            if (grid) grid.innerHTML = '';
             byId('combineBtn').disabled = true;
         }
 
@@ -1477,6 +1560,7 @@
 
             budgetUsd = parseInt(byId('budget').value || '0', 10);
             setLoading('loading1', true);
+            byId('rawDataTitle').textContent = 'Antigravity AI Agent is extracting clinical data...';
             byId('extractBtn').disabled = true;
 
             const formData = new FormData();
@@ -1518,23 +1602,30 @@
                 
                 const hospital = pkg.specialist?.hospital || 'Hospital';
                 const specialist = pkg.specialist?.name || 'Specialist';
-                const price = pkg.clinical_summary?.estimated_cost_formatted || (pkg.clinical_summary?.estimated_cost_usd ? `$${pkg.clinical_summary.estimated_cost_usd}` : 'TBD');
+                const netCost = pkg.total_care_package?.net_cost_formatted || (pkg.total_care_package?.net_cost ? formatUsd(pkg.total_care_package.net_cost) : 'TBD');
                 const dates = pkg.travel_dates ? `${pkg.travel_dates.arrival_date} to ${pkg.travel_dates.departure_date}` : 'Dates calculated upon request';
+                const score = pkg.total_accessibility_score || 0;
+                const route = pkg.flight?.route || `${pkg.structured_itinerary?.origin_city || 'Origin'} to ${pkg.structured_itinerary?.destination_city || 'Malaysia'}`;
+                const grant = pkg.grant_analysis?.potential_subsidy_usd || 0;
                 
                 card.innerHTML = `
-                    <div class="score">${pkg.package_type || 'Package'}</div>
+                    <div class="score">${pkg.package_type || 'Package'} • ${score}/100</div>
                     <div class="option-title">${hospital}</div>
                     <div class="option-detail"><strong>Specialist:</strong> ${specialist}</div>
-                    <div class="option-detail"><strong>Estimated Cost:</strong> ${price}</div>
+                    <div class="option-detail"><strong>Net Care Package:</strong> ${netCost}</div>
+                    <div class="option-detail"><strong>Route:</strong> ${route}</div>
                     <div class="option-detail"><strong>Calculated Dates:</strong> ${dates}</div>
                     <div class="tag-row">
-                        <span class="tag">${pkg.package_reasoning ? 'Optimized Reasoning' : ''}</span>
-                        ${pkg.charity ? `<span class="tag">Charity: ${pkg.charity.name}</span>` : ''}
+                        ${pkg.antigravity_state?.retrieval_strategy === 'raw_semantic' ? '<span class="tag" style="background:#64748b; color:white;">Manual Override Active</span>' : '<span class="tag">AI Optimized</span>'}
+                        ${grant > 0 ? `<span class="tag" style="background:rgba(15, 123, 108, 0.1); color:var(--primary);">Grant: ${formatUsd(grant)}</span>` : ''}
                     </div>
-                    <details style="margin-top:10px; font-size: 0.85rem; color: var(--muted);">
-                        <summary>Why this package?</summary>
-                        <p style="margin-top:5px; line-height:1.4;">${pkg.package_reasoning}</p>
-                    </details>
+                    
+                    <div class="ai-reasoning-box" style="background: rgba(15, 123, 108, 0.08); border-left-width: 4px; padding: 12px; margin-top: 14px;">
+                        <span class="ai-reasoning-label" style="display: flex; align-items: center; gap: 6px;">
+                            <span style="font-size: 1.1rem;">✨</span> Antigravity AI Analysis
+                        </span>
+                        <p style="margin:0; line-height:1.5; font-size: 0.92rem; color: #334155;">${pkg.package_reasoning || pkg.structured_itinerary?.summary}</p>
+                    </div>
                 `;
                 
                 card.addEventListener('click', () => {
@@ -1548,6 +1639,12 @@
             });
         }
 
+        byId('manual_override_toggle').addEventListener('change', () => {
+            if (!byId('step2').hidden) {
+                byId('proceedToLayersBtn').click();
+            }
+        });
+
         byId('proceedToLayersBtn').addEventListener('click', async () => {
             if (!globalMedicalData || !currentCountry) return;
 
@@ -1557,7 +1654,11 @@
 
             byId('step2').hidden = false;
             byId('choicesArea').hidden = true;
-            setLoading('loading2', true);
+            
+            // Set AI Thinking animation text
+            byId('matchingLoadingText').innerHTML = '<span class="ai-thinking">Antigravity AI Agent is thinking...</span> analyzing your condition and calculating optimal matches...';
+            setLoading('loading2', true, 'Antigravity Agent: Re-ranking with clinical priorities...');
+            await new Promise(r => setTimeout(r, 800)); // Visual "thinking" delay
             
             selections.package = null;
             byId('combineBtn').disabled = true;
@@ -1565,10 +1666,13 @@
             const payload = {
                 medical_data: globalMedicalData,
                 origin_country: currentCountry.originCountry,
+                user_origin: currentCountry.originCountry,
                 budget_local: parseFloat(byId('budget').value || '5000'),
                 currency: currentCountry.currency,
                 preferred_month: byId('preferred_month') ? byId('preferred_month').value : 'Next Month',
-                preferred_language: byId('preferred_language') ? byId('preferred_language').value : 'English'
+                preferred_language: byId('preferred_language') ? byId('preferred_language').value : 'English',
+                user_priority_preference: byId('user_priority_preference') ? byId('user_priority_preference').value : 'balanced',
+                manual_override: byId('manual_override_toggle') ? byId('manual_override_toggle').checked : false
             };
 
             try {
@@ -1604,7 +1708,8 @@
 
             byId('step3').hidden = false;
             byId('finalPackage').hidden = true;
-            setLoading('loading3', true);
+            setLoading('loading3', true, 'Antigravity Agent: Synthesizing final itinerary and reasoning...');
+            await new Promise(r => setTimeout(r, 600));
 
             const pkg = selections.package;
 
@@ -1612,15 +1717,19 @@
                 // Since package is already translated/orchestrated, we just display it
                 byId('packageReasoning').textContent = pkg.package_reasoning || '-';
                 byId('finalPackageData').textContent = JSON.stringify(pkg, null, 2);
+                byId('finalAccessibilityScore').textContent = `${pkg.total_accessibility_score || 0}/100`;
+                byId('finalNetCost').textContent = pkg.total_care_package?.net_cost_formatted || formatUsd(pkg.total_care_package?.net_cost);
+                byId('finalItineraryHeadline').textContent = pkg.structured_itinerary?.headline || pkg.package_type || '-';
+                byId('finalItinerarySummary').textContent = pkg.structured_itinerary?.summary || '-';
 
                 byId('finalHospName').textContent = pkg.specialist?.hospital || '-';
                 byId('finalHospLoc').textContent = pkg.specialist?.name ? `${pkg.specialist.name} - ${pkg.specialist.specialty || ''}` : '';
 
-                byId('finalFlightName').textContent = pkg.flight?.airline || pkg.flight?.provider || 'Commercial Flight';
-                byId('finalFlightDetail').textContent = [pkg.flight?.type, pkg.flight?.price].filter(Boolean).join(' - ');
+                byId('finalFlightName').textContent = pkg.flight?.route || 'Commercial Flight';
+                byId('finalFlightDetail').textContent = [pkg.flight?.travel_mode, formatUsd(pkg.flight?.travel_cost_usd), `${pkg.flight?.travel_duration_hours || 0}h`].filter(Boolean).join(' - ');
 
                 byId('finalCharityName').textContent = pkg.charity?.name || 'No Financial Aid Required';
-                byId('finalCharityOrg').textContent = pkg.charity?.organization || '';
+                byId('finalCharityOrg').textContent = pkg.grant_analysis?.grant_reason || pkg.charity?.organization || '';
 
                 byId('finalPackage').hidden = false;
                 window.scrollTo({ top: byId('step3').offsetTop - 12, behavior: 'smooth' });
@@ -1656,7 +1765,7 @@
                 template_key: templateKey,
                 user_data: userData,
                 medical_data: globalMedicalData || {},
-                package_data: { hospital: selections.hospital, flight: selections.flight, charity: selections.charity },
+                package_data: pkg, // Use the full package object which contains hospital, flight, and charity
                 target_language: targetLanguage
             };
         }
@@ -1680,7 +1789,7 @@
                 });
                 if (!response.ok) throw new Error('Failed to preview letter');
                 const data = await response.json();
-                byId('letterPreviewContainer').innerHTML = data.html;
+                byId('letterPreviewContainer').textContent = data.html;
             } catch (error) {
                 alert(error.message);
                 byId('letterModal').hidden = true;
@@ -1702,7 +1811,7 @@
                 });
                 if (!response.ok) throw new Error('Failed to translate letter');
                 const data = await response.json();
-                byId('letterPreviewContainer').innerHTML = data.html;
+                byId('letterPreviewContainer').textContent = data.html;
             } catch (error) {
                 alert(error.message);
             } finally {

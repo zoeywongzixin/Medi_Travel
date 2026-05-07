@@ -1,115 +1,196 @@
-# 🇲🇾 ASEAN Medical Match: Antigravity Orchestrator Pipeline
+# ASEAN Medical Match
 
-**ASEAN Medical Match** is a high-precision, multi-agent medical tourism platform designed to transform complex clinical data into empathetic, actionable medical travel itineraries for the ASEAN region.
+ASEAN Medical Match is a FastAPI-based medical travel matching system for patients seeking treatment in Malaysia. It combines OCR, privacy scrubbing, clinical structuring, hospital retrieval, logistics planning, charity matching, and support-letter generation in one pipeline.
 
-Powered by the **Antigravity AI Agent**, the platform provides transparent, reasoning-driven matching that bridges the gap between clinical requirements, logistical constraints, and patient financial needs.
+## What It Does
 
----
+- extracts text from chart images or PDFs
+- scrubs sensitive patient information before LLM use
+- structures messy chart text into medical case data
+- matches hospitals and specialists from a local ChromaDB store
+- estimates transport, travel dates, and financial support
+- generates itinerary summaries and printable support letters
 
-## 🏗 Architecture Diagram
+## Current Structure
+
+```text
+ai_medical_matching/
+|-- app.py
+|-- agents/
+|   |-- charity_agent.py
+|   |-- document_agent.py
+|   |-- flight_agent.py
+|   |-- logistics_agent.py
+|   |-- medical_agent.py
+|   |-- orchestrator.py
+|   `-- rerank_agent.py
+|-- data/
+|   |-- chroma_db/
+|   |-- mock_db.sqlite
+|   `-- mock_vietnam_nguyen_van_a.txt
+|-- frontend/
+|   `-- pipeline_tester.html
+|-- model_cache/
+|-- pipeline/
+|   |-- generate_charity_dashboard.py
+|   |-- generate_report.py
+|   |-- ingest_charities.py
+|   |-- ingest_doctors.py
+|   `-- ingest_mock_data.py
+|-- reports/
+|   |-- charity_dashboard.html
+|   `-- db_dashboard.html
+|-- tests/
+|   |-- dev_tools/
+|   |-- fixtures/
+|   `-- test_pipeline.py
+|-- utils/
+|   |-- currency.py
+|   |-- date_calculator.py
+|   |-- db.py
+|   |-- estimation.py
+|   |-- letter_generator.py
+|   |-- llm.py
+|   |-- medical_specialty.py
+|   |-- ocr_engine.py
+|   |-- parser.py
+|   |-- privacy.py
+|   |-- schemas.py
+|   |-- translator.py
+|   `-- poppler-25.12.0/
+|-- docker-compose.yml
+|-- Dockerfile
+`-- requirements.txt
+```
+
+## Architecture
 
 ```mermaid
-graph TD
-    subgraph "User Interface (Antigravity Experience)"
-        A["[User Input] Medical Report / Budget"] --> B["Multilingual Dashboard"]
-        B --> B1["AI Thinking Feedback"]
-    end
+flowchart TD
+    A["Chart Upload<br/>Image or PDF"] --> B["OCR Engine<br/>utils/ocr_engine.py"]
+    B --> C["Privacy Scrubber<br/>utils/privacy.py"]
+    C --> D["Translation Layer<br/>utils/translator.py"]
+    D --> E["Medical Parser<br/>utils/parser.py"]
+    E --> F["Clinical Gap Check<br/>utils/llm.py"]
+    F --> G["Orchestrator<br/>agents/orchestrator.py"]
+    G --> H["Hospital Retrieval<br/>agents/medical_agent.py"]
+    G --> I["Logistics + Route<br/>agents/logistics_agent.py"]
+    G --> J["Charity Matching<br/>agents/charity_agent.py"]
+    H --> K["Reranker<br/>agents/rerank_agent.py"]
+    I --> L["Package Assembly"]
+    J --> L
+    K --> L["Package Assembly"]
+    L --> M["Tester UI / API Response<br/>frontend/pipeline_tester.html"]
+    L --> N["Letter Generation<br/>utils/letter_generator.py"]
+    N --> O["Preview / PDF Endpoints"]
 
-    subgraph "Lead Orchestrator (FastAPI)"
-        B --> C["/api/v1/extract"]
-        C --> D["Clinical Agent (OCR + Llama 3.2)"]
-        
-        D --> F["Orchestration Engine"]
-        
-        subgraph "Phase 1: Parallel Intelligence"
-            F --> G["Medical Agent"]
-            F --> H["Logistics Agent"]
-            F --> I["Financial Agent"]
-        end
-        
-        G --> G1["Hospital RAG (ChromaDB)"]
-        H --> H1["Route Simulation & Estimates"]
-        I --> I1["Currency & Charity Matching"]
-        
-        subgraph "Phase 2: Reasoning & Synthesis"
-            G1 & H1 & I1 --> J["Gemini 2.5 Flash"]
-            J --> K["'Why this match?' Reasoning Engine"]
-        end
-    end
-
-    subgraph "Delivery & Documentation"
-        K --> L["3-Tier Package Grid"]
-        L --> M["Antigravity Reasoning Cards"]
-        M --> N["Automated PDF Dossier (Visa/Appt)"]
-    end
-
-    %% Intelligence Loops
-    J -.->|"Layman-Friendly Explanation"| M
+    P["ChromaDB<br/>data/chroma_db"] --> H
+    P --> J
+    Q["SQLite Match Log<br/>data/mock_db.sqlite"] --> G
 ```
 
----
+## Request Flow
 
-## 🚀 Key Features
+1. `POST /api/v1/extract`
+   OCRs the uploaded chart, scrubs PII, translates the text, and returns structured medical data.
+2. `POST /api/v1/match-packages`
+   Builds ranked packages from hospital retrieval, route simulation, grant estimates, and budget rules.
+3. `POST /api/v1/preview-letter` or `POST /api/v1/generate-letter`
+   Produces support-letter previews or PDFs from the selected package.
 
-### 🧠 Antigravity AI Reasoning (Gemini 2.5 Flash)
-Unlike standard RAG systems that just list results, Antigravity uses **Gemini 2.5 Flash** to synthesize a "Solid Reason" for every recommendation.
-- **Empathetic Explanations**: Converts clinical jargon into layman-friendly reassurance.
-- **Holistic Context**: Explains why a specific hospital, flight route, and charity grant were combined for *this specific patient*.
-- **Multilingual Reasoning**: Automatically translates "Why this match?" summaries into the user's local language (Indonesian, Malay, etc.).
+## Main API Endpoints
 
-### 🏗 3-Layer Orchestration Model
-1. **The Clinical Layer**: Extracts "Ground Truth" from raw reports (Severity, Urgency, Age Group) using Tesseract and Llama 3.2.
-2. **The Logistics Layer**: Simulates ASEAN-specific travel routes and matches patients with **100+ MHTC-accredited hospitals** in Malaysia.
-3. **The Financial Layer**: Performs live currency conversion (CurrencyFreaks) and eligibility matching for **ASEAN Charity Funds** if a budget gap is detected.
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| `GET` | `/` | Health check |
+| `GET` | `/tester` | Interactive browser tester |
+| `POST` | `/api/v1/extract` | OCR -> scrub -> translate -> parse |
+| `POST` | `/api/v1/match-packages` | Full orchestration |
+| `POST` | `/api/v1/match-hospitals` | Hospital retrieval only |
+| `POST` | `/api/v1/match-flights` | Route and logistics only |
+| `POST` | `/api/v1/match-charities` | Charity retrieval only |
+| `POST` | `/api/v1/combine-package` | Build one final package from chosen pieces |
+| `POST` | `/api/v1/preview-letter` | Letter preview |
+| `POST` | `/api/v1/generate-letter` | PDF generation |
+| `POST` | `/api/v1/translate-template` | Template translation |
+| `POST` | `/api/v1/translate-text` | Display-text translation |
+| `POST` | `/api/v1/full-pipeline` | One-shot upload-to-package flow |
 
-### 📄 Automated Document Pipeline
-Generates professional, submission-ready medical travel documents:
-- **MHTC Visa Support Letters**: Includes clinical extraction summaries and Borang IM.47 facilitation requests.
-- **Appointment Confirmations**: Direct hospital referrals with MMC registration placeholders.
-- **Charity Memos**: Formal documentation of matched financial aid for hospital patient centers.
+## Local Setup
 
----
+### Requirements
 
-## 🌍 Localization & Transparency
-The platform is designed for cross-border medical facilitation:
-- **UI Localization**: Full support for 10+ ASEAN locales.
-- **Agentic Transparency**: Visual "AI Thinking" indicators show exactly which re-ranking step the Antigravity agent is performing.
-- **Manual Override Mode**: Allows users to bypass AI optimization to view raw clinical matching order from ChromaDB.
+- Python 3.10+
+- Tesseract OCR
+- Poppler for PDF conversion
+- optional Gemini API key
 
----
+### Install
 
-## ⚙️ Setup & Environment
-
-### Prerequisites
-- **Docker & Docker Compose**
-- **Ollama**: Running locally for clinical extraction (Llama 3.2).
-- **Gemini API Key**: For dynamic reasoning generation.
-
-### Environment Variables (`.env`)
-| Variable | Description |
-| :--- | :--- |
-| `GEMINI_API_KEY` | Powers the Antigravity Reasoning Engine. |
-| `CURRENCY_FREAKS_API_KEY` | Real-time FX rates for ASEAN currencies. |
-| `SERPAPI_KEY` | Real-time flight search (Optional). |
-| `OLLAMA_BASE_URL` | Endpoint for the Llama 3.2 clinical engine. |
-
----
-
-## 🐳 Running Locally
-
-```powershell
-# Build and start the pipeline
-docker compose up --build
+```bash
+pip install -r requirements.txt
 ```
 
-Access the **Antigravity Pipeline Tester** at [http://localhost:8000/tester](http://localhost:8000/tester).
+### Environment
 
----
+Create `.env`:
 
-## 🛠 Tech Stack
-- **Backend**: FastAPI, Python 3.10+
-- **Database**: ChromaDB (Vector Search)
-- **Intelligence**: Gemini 2.5 Flash, Ollama (Llama 3.2)
-- **OCR**: Tesseract OCR
-- **Documentation**: fpdf2 (PDF Generation)
-- **Frontend**: Vanilla HTML/JS with CSS Design Tokens
+```env
+GEMINI_API_KEY=your_key_here
+GEMINI_TRANSLATION_MODEL=gemini-2.5-flash-lite
+GEMINI_PARSER_MODEL=gemini-2.5-flash
+GEMINI_REASONING_MODEL=gemini-2.5-flash
+TESSERACT_PATH=C:\Program Files\Tesseract-OCR\tesseract.exe
+POPPLER_PATH=C:\poppler\bin
+SERPAPI_KEY=optional
+CURRENCY_FREAKS_API_KEY=optional
+GLOBALGIVING_API_KEY=optional
+```
+
+### Seed Data
+
+Recommended for local testing:
+
+```bash
+python pipeline/ingest_mock_data.py
+```
+
+Optional refresh jobs:
+
+```bash
+python pipeline/ingest_doctors.py
+python pipeline/ingest_charities.py
+```
+
+### Run
+
+```bash
+uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+```
+
+Open the tester at [http://localhost:8000/tester](http://localhost:8000/tester).
+
+## Tests and Debugging
+
+Main test:
+
+```bash
+python -m pytest tests/test_pipeline.py -v
+```
+
+Useful helper scripts:
+
+```bash
+python tests/dev_tools/check_db.py
+python tests/dev_tools/check_charity_conditions.py
+python tests/dev_tools/test_connections.py
+python tests/dev_tools/test_ocr_full.py
+python tests/dev_tools/test_vietnamese_parsing.py
+python tests/dev_tools/test_api.py
+```
+
+## Cleanup Notes
+
+- cache folders like `__pycache__/` and `.pytest_cache/` are not part of the project structure
+- duplicate tester and nested fixture copies were removed
+- runtime stores under `data/` are intentionally kept because the app depends on them

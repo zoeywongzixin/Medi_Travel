@@ -93,12 +93,9 @@ def _build_package_label(index: int, preference: str, manual_override: bool) -> 
     return f"Alternative {index}"
 
 
-def _generate_reasoning_with_gemini(hospital, route, total_care_package, subsidy):
-    # Try both possible env var names
-    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        return None
+from utils.llm import call_gemini
 
+def _generate_reasoning_with_gemini(hospital, route, total_care_package, subsidy):
     hospital_name = hospital.get("hospital", "the hospital")
     specialty = hospital.get("specialty", "the medical condition")
     net_cost = total_care_package["net_cost"]
@@ -128,31 +125,10 @@ def _generate_reasoning_with_gemini(hospital, route, total_care_package, subsidy
     - Keep it between 40-70 words.
     - Do NOT use markdown bolding or quotes.
     """
-
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key={api_key}"
-    payload = {
-        "contents": [{"parts": [{"text": prompt}]}]
-    }
     
-    # Simple retry loop for robustness in flaky network environments (like Docker)
-    for attempt in range(2):
-        try:
-            response = requests.post(url, json=payload, timeout=30)
-            if response.status_code == 200:
-                data = response.json()
-                reasoning = data['candidates'][0]['content']['parts'][0]['text'].strip()
-                # Clean up potential markdown or quotes
-                return reasoning.replace("**", "").replace("\"", "")
-            else:
-                print(f"Gemini Error (Attempt {attempt+1}): {response.status_code} - {response.text}")
-        except Exception as e:
-            print(f"Gemini Exception (Attempt {attempt+1}): {e}")
-        
-        if attempt == 0:
-            import time
-            time.sleep(1) # Wait a bit before retrying
-    
-    return None
+    res = call_gemini(prompt, "Generate reasoning.", model_name="gemini-3.0-flash")
+    text = res.get("text", "").strip()
+    return text.replace("**", "").replace("\"", "") if text else None
 
 
 def _build_structured_itinerary(
@@ -250,6 +226,7 @@ def orchestrate_packages(
     user_origin: str = None,
     user_priority_preference: str = "balanced",
     manual_override: bool = False,
+    rejected_hospitals: list = None,
 ) -> List[Dict]:
     """
     ChromaDB remains the source of truth for hospital retrieval.
@@ -262,7 +239,14 @@ def orchestrate_packages(
     resolved_origin_city = resolve_user_origin_city(normalized_origin)
 
     clinical_summary = generate_clinical_summary(medical_data)
-    hospitals = match_hospitals(medical_data, retrieval_mode=retrieval_mode, top_n=3)
+    hospitals = match_hospitals(medical_data, retrieval_mode=retrieval_mode, top_n=6)  # fetch more to allow filtering
+
+    # Filter out hospitals previously rejected by the user (memory)
+    rejected_set = {h.lower() for h in (rejected_hospitals or [])}
+    if rejected_set:
+        hospitals = [h for h in hospitals if h.get("hospital", "").lower() not in rejected_set]
+        print(f"[MEMORY]: Filtered out {len(rejected_hospitals)} rejected hospital(s). Remaining: {len(hospitals)}")
+    hospitals = hospitals[:3]  # cap to top 3
     if not hospitals:
         return []
 

@@ -53,8 +53,13 @@ def _get_collection() -> Optional[chromadb.Collection]:
         os.environ["CHROMA_ANONYMIZED_TELEMETRY"] = "False"
         _client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
         emb_fn = embedding_functions.DefaultEmbeddingFunction()
-        _collection = _client.get_collection(name="charities", embedding_function=emb_fn)
-        return _collection
+        for collection_name in ("malaysia_charities", "charities"):
+            try:
+                _collection = _client.get_collection(name=collection_name, embedding_function=emb_fn)
+                return _collection
+            except Exception:
+                continue
+        raise ValueError("No charity collection found. Expected 'malaysia_charities' or 'charities'.")
     except Exception as exc:
         print(f"[CharityAgent] ChromaDB unavailable: {exc}")
         print("[CharityAgent] Run: python pipeline/ingest_charities.py")

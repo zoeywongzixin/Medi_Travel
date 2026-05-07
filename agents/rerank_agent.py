@@ -1,45 +1,19 @@
-"""
-Rerank Agent
-============
-Takes a pre-filtered shortlist of doctor candidates (up to 5) and uses
-the local Ollama LLM as a judge to select and rank the final top-3.
-
-The LLM receives only the candidates that have already passed:
-  1. Hybrid RRF search (semantic + keyword)
-  2. Specialty-group hard gate
-  3. Metadata-enriched numeric scoring
-
-So the prompt is deliberately small and tightly scoped — the model just
-compares 5 well-matched doctors and returns a ranked JSON list of IDs.
-
-Fallback: if Ollama is unavailable or returns invalid JSON, the function
-returns the candidates as-is (already in scored order from Stage 3).
-"""
-
 import json
 import os
 import re
 from typing import Dict, List
 
-import ollama
+from utils.llm import call_gemini
 
 
 def llm_rerank(candidates: List[Dict], medical_data: Dict, top_n: int = 3) -> List[Dict]:
     """
-    Use Ollama as a judge to rerank up to 5 pre-vetted doctor candidates.
-
-    Args:
-        candidates:   List of up to 5 candidate dicts (already scored & filtered).
-        medical_data: Original patient data dict (condition, severity, urgency, etc.)
-        top_n:        How many final results to return (default 3).
-
-    Returns:
-        Reranked list of up to `top_n` doctor dicts.
+    Use Gemini 3.0 Flash as a judge to rerank up to 5 pre-vetted doctor candidates.
+    Fallback: returns candidates as-is (already in scored order) if Gemini fails.
     """
     if not candidates:
         return []
 
-    # If only 1–2 candidates, no point calling the LLM
     if len(candidates) <= top_n:
         return candidates[:top_n]
 
@@ -47,7 +21,6 @@ def llm_rerank(candidates: List[Dict], medical_data: Dict, top_n: int = 3) -> Li
     severity = medical_data.get("severity", "Unknown")
     urgency = medical_data.get("urgency", "Unknown")
 
-    # Build a compact representation of each candidate for the prompt
     candidate_summaries = []
     for c in candidates:
         candidate_summaries.append({
@@ -84,25 +57,9 @@ def llm_rerank(candidates: List[Dict], medical_data: Dict, top_n: int = 3) -> Li
     )
 
     try:
-        print(f"  [RerankAgent] Calling AI judge (Ollama) to compare {len(candidates)} candidates for '{diagnosis}'...")
-        ollama_host = os.getenv("OLLAMA_HOST", "http://ollama:11434")
-        client = ollama.Client(host=ollama_host)
-        response = client.chat(
-            model="llama3.2:3b",
-            format="json",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            options={"temperature": 0.0, "num_ctx": 1024},
-        )
-
-        # Handle both old (dict) and new (object) Ollama response formats
-        raw_content = (
-            response.message.content.strip()
-            if hasattr(response, "message")
-            else response["message"]["content"].strip()
-        )
+        print(f"  [RerankAgent] Calling Gemini to rerank {len(candidates)} candidates for '{diagnosis}'...")
+        res = call_gemini(system_prompt, user_prompt, model_name="gemini-3.0-flash")
+        raw_content = res.get("text", "").strip()
 
         # Extract a JSON array from the response (handle model wrapping it in an object)
         ranked_ids = _parse_ranked_ids(raw_content)

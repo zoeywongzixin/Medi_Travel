@@ -20,7 +20,8 @@ from utils.translator import (
     translate_template_text,
     translate_text,
 )
-from utils.parser import get_concise_json, scrub_raw_text
+from utils.parser import get_concise_json
+from utils.privacy import PrivacyScrubber
 from utils.letter_generator import (
     LETTER_SKELETONS,
     VISA_TEMPLATE_KEYS,
@@ -36,7 +37,10 @@ from agents.orchestrator import orchestrate_packages, generate_single_package
 from agents.medical_agent import match_hospitals
 from agents.flight_agent import get_flight_options
 from agents.charity_agent import match_charities
-from typing import Optional
+from utils.llm import check_for_clinical_gaps
+from utils.db import log_match, get_few_shot_feedback
+from typing import Optional, List
+import uuid
 
 app = FastAPI(title="Malaysia Medical Match API", version="1.0.0")
 
@@ -57,6 +61,8 @@ class MatchRequest(BaseModel):
     preferred_language: str = Field(default="English", description="Target language for outputs")
     user_priority_preference: str = Field(default="balanced", description="How to rank accessible packages")
     manual_override: bool = Field(default=False, description="Bypass accessibility reranking and preserve raw semantic hits")
+    session_id: Optional[str] = Field(default=None, description="Session ID for memory and regeneration")
+    rejected_hospitals: Optional[List[str]] = Field(default_factory=list, description="Hospital names already rejected by user")
 
 class LayerRequest(BaseModel):
     medical_data: Dict[str, Any]
@@ -111,7 +117,9 @@ async def extract_chart(file: UploadFile = File(...)):
             raise HTTPException(status_code=400, detail=raw_text)
             
         # Scrub sensitive info BEFORE sending to the LLM
-        safe_raw_text = scrub_raw_text(raw_text)
+        scrubber = PrivacyScrubber()
+        safe_raw_text = scrubber.scrub_raw_text(raw_text)
+        privacy_logs = scrubber.get_logs()
             
         # 2. Translation
         english_text = translate_medical_text(safe_raw_text)
@@ -121,6 +129,7 @@ async def extract_chart(file: UploadFile = File(...)):
         
         return {
             "medical_data": structured_data,
+            "privacy_logs": privacy_logs,
             "debug": {
                 "raw_text_original": raw_text,
                 "raw_text_scrubbed": safe_raw_text,
@@ -138,17 +147,38 @@ async def extract_chart(file: UploadFile = File(...)):
 async def match_packages(request: MatchRequest):
     """
     Step 2: Takes the extracted medical data and orchestrates layers 1, 2, and 3.
+    Supports memory (rejected_hospitals) and Few-Shot feedback injection.
     """
     medical_data = request.medical_data
     origin = request.origin_country
     preferred_month = request.preferred_month
     language = request.preferred_language
-    
+    session_id = request.session_id or str(uuid.uuid4())
+
+    # Step 2a: Agentic Clarification Loop - check for clinical gaps first
+    clarification = check_for_clinical_gaps(medical_data)
+    if clarification:
+        return {
+            "clarification_required": True,
+            "session_id": session_id,
+            "missing_detail": clarification.get("missing_detail_description"),
+            "clarification_question": clarification.get("clarification_question"),
+            "agent_thinking_step": "Checking for Clinical Gaps...",
+        }
+
+    # Step 2b: Few-Shot Feedback Loop - inject prior corrections into context
+    condition = medical_data.get("condition", "")
+    prior_feedback = get_few_shot_feedback(condition)
+    if prior_feedback:
+        feedback_notes = "; ".join([f'Previously corrected: {f["feedback"]}' for f in prior_feedback])
+        medical_data["_prior_corrections"] = feedback_notes
+        print(f"[FEW-SHOT]: Injecting {len(prior_feedback)} prior corrections for condition '{condition}'")
+
     # Convert local budget to USD for internal logic
     from utils.currency import convert_to_usd
     budget_usd = convert_to_usd(request.budget_local, request.currency)
-    
-    # Orchestrate packages (Hospital, Flight, Charity)
+
+    # Orchestrate packages (Hospital, Flight, Charity) - skip rejected hospitals
     packages = orchestrate_packages(
         medical_data=medical_data,
         origin_country=origin,
@@ -158,9 +188,20 @@ async def match_packages(request: MatchRequest):
         user_origin=request.user_origin,
         user_priority_preference=request.user_priority_preference,
         manual_override=request.manual_override,
+        rejected_hospitals=request.rejected_hospitals or [],
     )
     logistics_data = packages[0]["flight_logistics"] if packages else get_transport_requirements(medical_data, origin=origin, destination="Malaysia")
-    
+
+    # Step 2c: Human-in-the-Loop - log match, flag High Urgency as pending
+    urgency = medical_data.get("urgency", "Stable")
+    db_status = "pending" if urgency in ("Urgent", "Critical") else "approved"
+    if packages:
+        top = packages[0]
+        hospital_name = (top.get("specialist") or {}).get("hospital", "Unknown")
+        flight_name = (top.get("flight") or {}).get("airline", "Unknown")
+        charity_name = ((top.get("charity") or {}).get("name", "None"))
+        log_match(session_id, db_status, condition, hospital_name, flight_name, charity_name, urgency)
+
     # Translate outputs if necessary
     if language.lower() not in ["english", "en"]:
         for p in packages:
@@ -170,8 +211,10 @@ async def match_packages(request: MatchRequest):
                 p["structured_itinerary"]["summary"] = translate_text(p["structured_itinerary"]["summary"], language)
             if "clinical_summary" in p and "professional_summary" in p["clinical_summary"]:
                 p["clinical_summary"]["professional_summary"] = translate_text(p["clinical_summary"]["professional_summary"], language)
-    
+
     return {
+        "session_id": session_id,
+        "match_status": db_status,
         "agent_response": _build_agent_response(packages, request.manual_override),
         "logistics": logistics_data,
         "recommended_packages": packages
@@ -338,7 +381,9 @@ async def full_pipeline(
         if "Error" in raw_text:
             raise HTTPException(status_code=400, detail=raw_text)
             
-        safe_raw_text = scrub_raw_text(raw_text)
+        scrubber = PrivacyScrubber()
+        safe_raw_text = scrubber.scrub_raw_text(raw_text)
+        privacy_logs = scrubber.get_logs()
         english_text = translate_medical_text(safe_raw_text)
         medical_data = get_concise_json(english_text)
         
@@ -366,6 +411,7 @@ async def full_pipeline(
         return {
             "agent_response": _build_agent_response(packages, manual_override),
             "extracted_medical_data": medical_data,
+            "privacy_logs": privacy_logs,
             "logistics": logistics_data,
             "recommended_packages": packages
         }

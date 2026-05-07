@@ -144,7 +144,11 @@ def _normalize_urgency_status(medical_data: Optional[Dict[str, Any]]) -> str:
 
 
 def _format_hospital_line(package_data: Optional[Dict[str, Any]], user_data: Dict[str, Any]) -> str:
-    hospital = (package_data or {}).get("hospital") or {}
+    hospital = (
+        (package_data or {}).get("specialist")
+        or (package_data or {}).get("hospital")
+        or {}
+    )
     hospital_name = _clean_text(
         hospital.get("hospital") or hospital.get("name") or user_data.get("hospital_name"),
         "Hospital to be confirmed in Malaysia",
@@ -168,20 +172,28 @@ def _format_flight_line(package_data: Optional[Dict[str, Any]], user_data: Dict[
         proposed_date = _clean_text(user_data.get("start_date"), "date to be confirmed")
         return f"Flight arrangement pending final booking. Proposed travel timing: {proposed_date}."
 
-    carrier = flight.get("airline") or flight.get("provider") or "Selected carrier"
-    flight_type = flight.get("type") or "Medical travel flight"
-    price = flight.get("price")
+    route = flight.get("route")
+    travel_mode = flight.get("travel_mode") or flight.get("type") or "Medical travel flight"
     departure = flight.get("departure")
     arrival = flight.get("arrival")
+    travel_duration = flight.get("travel_duration_hours")
+    travel_cost = flight.get("travel_cost_usd") or flight.get("price")
 
-    details = [f"{carrier} ({flight_type})"]
+    details = []
+    if route:
+        details.append(route)
+    if travel_mode:
+        details.append(travel_mode)
     if departure:
         details.append(f"departure {departure}")
     if arrival:
         details.append(f"arrival {arrival}")
-    if price:
-        details.append(f"estimated fare {price}")
-    return ", ".join(details) + "."
+    if travel_duration not in (None, ""):
+        details.append(f"estimated duration {travel_duration} hours")
+    if travel_cost not in (None, ""):
+        details.append(f"estimated fare USD {travel_cost}")
+
+    return ", ".join(details) + "." if details else "Flight arrangement pending final booking."
 
 
 def _format_charity_line(package_data: Optional[Dict[str, Any]]) -> str:
@@ -295,12 +307,11 @@ def build_visa_support_content(
         "MHTC Liaison / Medical Travel Coordination Desk",
         "Malaysia Medical Match Platform",
     ])
-    
-    # If template_str looks like a key, use the skeleton, otherwise use the string directly
+
+    if template_str in VISA_TEMPLATE_KEYS:
+        return content
+
     final_template = LETTER_SKELETONS.get(template_str, template_str)
-    
-    # If the template contains placeholders like {diagnosis}, {charity_details}, etc.
-    # we fill it using our enriched user_data
     return fill_template(final_template, user_data)
 
 def enrich_user_data_with_package(user_data: Dict[str, Any], medical_data: Dict[str, Any], package_data: Dict[str, Any]):

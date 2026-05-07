@@ -1,0 +1,90 @@
+BỆNH VIỆN ĐA KHOA TỈNH HÀ NỘI
+PHIẾU KẾT QUẢ XÉT NGHIỆM & ĐIỆN TÂM ĐỒ
+
+Họ và tên: Nguyễn Văn A
+Ngày sinh: [REDACTED_DOB]
+Số điện thoại: [REDACTED_PHONE]
+Địa chỉ: 45 Phố Huế, Quận Hai Bà Trưng, Hà Nội, Việt Nam
+
+==========================================
+A. KẾT QUẢ XÉT NGHIỆM MÁU (BLOOD TEST)
+   Ngày lấy mẫu: 05/05/2026
+==========================================
+
+Chỉ số đường huyết lúc đói (Fasting Blood Glucose):
+  Kết quả: 12.8 mmol/L  [HIGH - Bình thường: 3.9 - 6.0 mmol/L]
+  Nhận xét: Tăng đường huyết nghiêm trọng (Severe Hyperglycemia)
+
+HbA1c (Hemoglobin A1c):
+  Kết quả: 9.4%  [HIGH - Bình thường: < 5.7%]
+  Nhận xét: Kiểm soát đường huyết rất kém, đái tháo đường type 2 không kiểm soát được
+  (Very poor glycemic control - Uncontrolled Type 2 Diabetes Mellitus)
+
+Creatinine huyết thanh (Serum Creatinine):
+  Kết quả: 198 umol/L  [HIGH - Bình thường: 62 - 115 umol/L]
+  Nhận xét: Suy thận mãn tính giai đoạn 3 (Chronic Kidney Disease Stage 3)
+
+eGFR (Estimated Glomerular Filtration Rate):
+  Kết quả: 34 mL/min/1.73m2  [LOW - Bình thường: > 60]
+  Nhận xét: Suy thận mãn (CKD Stage 3b)
+
+Cholesterol toàn phần:
+  Kết quả: 6.8 mmol/L  [HIGH - Bình thường: < 5.2 mmol/L]
+
+LDL Cholesterol:
+  Kết quả: 4.1 mmol/L  [HIGH - Mục tiêu: < 1.8 mmol/L]
+
+Triglycerides:
+  Kết quả: 3.2 mmol/L  [HIGH - Bình thường: < 1.7 mmol/L]
+
+Urinalysis (Nước tiểu):
+  Microalbuminuria: 280 mg/24h  [HIGH - Bình thường: < 30 mg/24h]
+  Nhận xét: Đạm niệu vi lượng (Proteinuria) - biến chứng thận do đái tháo đường
+
+==========================================
+B. ĐIỆN TÂM ĐỒ (ECG / ELECTROCARDIOGRAM)
+   Ngày ghi: 05/05/2026
+==========================================
+
+Nhịp tim (Heart Rate): 88 bpm - Nhịp xoang (Sinus Rhythm)
+Trục QRS: +75 độ (Bình thường)
+
+Phát hiện bất thường:
+  - ST-segment depression: 0.5mm ở chuyển đạo V4-V6
+    (Nhận xét: Gợi ý thiếu máu cơ tim vùng trước bên - Possible lateral ischemia)
+  - Sóng T âm (T-wave inversion) ở chuyển đạo aVL, V5
+    (Nhận xét: Có thể do bệnh động mạch vành - Possible coronary artery disease)
+  - Khoảng QTc: 458ms (Bình thường < 450ms ở nam) - QTc kéo dài nhẹ
+
+Kết luận ECG:
+  Bất thường ECG gợi ý thiếu máu cơ tim mạn tính, cần đánh giá thêm bằng chụp mạch vành (coronary angiography).
+  (ECG abnormality suggesting chronic myocardial ischemia. Recommend coronary angiography for further evaluation.)
+
+==========================================
+C. CHẨN ĐOÁN LÂM SÀNG (CLINICAL DIAGNOSIS)
+==========================================
+
+1. Đái tháo đường type 2 không kiểm soát (Uncontrolled Type 2 Diabetes Mellitus)
+2. Bệnh thận đái tháo đường giai đoạn 3 (Diabetic Nephropathy, CKD Stage 3)
+3. Nghi ngờ bệnh động mạch vành (Suspected Coronary Artery Disease)
+4. Rối loạn lipid máu (Dyslipidemia)
+
+Mức độ nặng (Severity): Cao (High)
+Tính cấp bách (Urgency): Cấp (Urgent)
+Nhóm tuổi (Age Group): Người trưởng thành (Adult)
+
+==========================================
+D. KHUYẾN NGHỊ (RECOMMENDATION)
+==========================================
+
+Bệnh nhân cần được chuyển viện để:
+1. Đánh giá toàn diện tim mạch và thận tại trung tâm chuyên khoa.
+2. Xem xét chụp mạch vành (Coronary Angiography / CT Coronary Angiography).
+3. Điều chỉnh phác đồ điều trị đái tháo đường và thận mạn.
+4. Có thể cần can thiệp mạch vành qua da (PCI) nếu xác nhận bệnh động mạch vành.
+
+Recommendation: Patient requires urgent specialist cardiology and nephrology evaluation.
+Recommend referral to Malaysia for specialist cardiovascular and renal care.
+
+Bác sĩ điều trị: Dr. Phạm Thị Lan
+MMC Registration: [REDACTED_LICENSE]

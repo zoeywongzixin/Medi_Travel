@@ -1,17 +1,53 @@
-# Large AI Models
+# Large AI Models & Embeddings
 model_cache/
 
-# Databases
+# Databases & Vector Stores
 data/chroma_db/
+data/mock_db.sqlite
 *.sqlite3
 *.bin
 
-# Python Junk
+# Python
 __pycache__/
+.pytest_cache/
 *.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual Environments
+venv/
+.venv/
+env/
 
 # Environment Secrets
 .env
+.env.*
 
 # External Binaries
 utils/poppler-*/
+
+# Temp files
+temp_*.jpg
+temp_*.pdf
+temp_*.png
+temp_full_*
+
+# Generated outputs
+generated_docs/
+
+# Accidental nested fixture copies
+tests/fixtures/tests/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp

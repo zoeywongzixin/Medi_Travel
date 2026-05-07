@@ -464,14 +464,129 @@
                 font-size: 1.7rem;
             }
         }
+
+        /* ---- PRIVACY LOG CONSOLE ---- */
+        .privacy-console {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 10px;
+            padding: 14px 16px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.82rem;
+            color: #58a6ff;
+            min-height: 60px;
+            max-height: 180px;
+            overflow-y: auto;
+            line-height: 1.8;
+        }
+        .privacy-console .log-warn { color: #ffa657; }
+        .privacy-console .log-ok   { color: #3fb950; }
+        .privacy-console .log-err  { color: #f85149; }
+        .privacy-console .log-step { color: #d2a8ff; }
+
+        /* ---- AGENT THINKING STEPS ---- */
+        .agent-pipeline {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin: 12px 0;
+        }
+        .agent-step {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 12px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: var(--muted);
+            background: var(--panel-soft);
+            transition: all 0.4s ease;
+        }
+        .agent-step.active {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: rgba(15,123,108,0.08);
+            box-shadow: 0 0 8px rgba(15,123,108,0.2);
+        }
+        .agent-step.done {
+            border-color: var(--success);
+            color: var(--success);
+            background: rgba(21,128,61,0.06);
+        }
+        .agent-step-arrow { color: var(--muted); font-size: 0.75rem; }
+
+        /* ---- CLARIFICATION PANEL ---- */
+        .clarification-panel {
+            border: 2px solid var(--accent);
+            border-radius: 12px;
+            padding: 20px 24px;
+            background: rgba(245,158,11,0.05);
+        }
+        .clarification-icon { font-size: 2rem; margin-bottom: 8px; display: block; }
+        .clarification-q { font-size: 1rem; font-weight: 700; margin-bottom: 14px; color: #92400e; }
+        .clarification-input {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1.5px solid var(--accent);
+            border-radius: 10px;
+            font-size: 1rem;
+            color: var(--text);
+            background: #fff;
+        }
+
+        /* ---- REGENERATE BADGE ---- */
+        .regenerate-btn {
+            background: #7c3aed;
+            color: #fff;
+        }
+        .regenerate-btn:hover { opacity: 0.88; }
+        .pending-badge {
+            display: inline-block;
+            background: var(--accent);
+            color: #fff;
+            font-size: 0.7rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 800;
+            text-transform: uppercase;
+            margin-left: 6px;
+            vertical-align: middle;
+        }
     </style>
 </head>
 <body>
     <div class="page">
         <header class="header">
             <h1 class="title" id="appTitle">ASEAN Medical Match</h1>
-            <p class="subtitle" id="appSubtitle">Lead Orchestrator v1.1 - Choose your country to continue in your local language.</p>
+            <p class="subtitle" id="appSubtitle">Lead Orchestrator v2.0 - Production-grade agentic system with Privacy Shield.</p>
+            <div style="margin-top:20px; display:flex; gap:10px;">
+                <button type="button" id="loadVietnamMockBtn" style="background:linear-gradient(135deg,#d32f2f,#b71c1c);color:#fff;padding:12px 20px;border-radius:8px;border:none;font-weight:bold;cursor:pointer;display:flex;align-items:center;gap:10px;box-shadow:0 4px 15px rgba(183,28,28,0.3);transition:transform 0.2s;">
+                    <span style="font-size:1.4rem;">&#x1F1FB;&#x1F1F3;</span> Load Vietnam Mock (Private Mode)
+                </button>
+            </div>
         </header>
+
+        <!-- Privacy Log Console -->
+        <section class="panel" id="privacyPanel" hidden>
+            <h2 class="panel-title" style="display:flex;align-items:center;gap:8px;">🔐 Privacy Shield <span style="font-size:0.75rem;font-weight:400;color:var(--muted);">(Active)</span></h2>
+            <p class="panel-hint">Real-time log of PII scrubbing and agent routing decisions.</p>
+            <div class="privacy-console" id="privacyConsole">Waiting for data...</div>
+        </section>
+
+        <!-- Clarification Panel -->
+        <section class="panel clarification-panel" id="clarificationPanel" hidden>
+            <span class="clarification-icon">🤔</span>
+            <h2 class="panel-title">Agent Needs More Information</h2>
+            <p class="panel-hint">The AI agent detected a missing clinical detail before it can safely recommend a care package.</p>
+            <p class="clarification-q" id="clarificationQuestion"></p>
+            <textarea class="clarification-input" id="clarificationInput" rows="3" placeholder="Type your answer here..."></textarea>
+            <div class="button-row" style="margin-top:14px;">
+                <button type="button" class="primary-btn" id="submitClarificationBtn">Submit & Continue</button>
+            </div>
+        </section>
 
         <section class="panel" id="countryPanel">
             <h2 class="panel-title" id="countryTitle">Choose your country</h2>
@@ -544,6 +659,17 @@
             <div class="loading" id="loading1">
                 <span class="dot-loader"><span></span><span></span><span></span></span>
                 <span id="extractLoadingText">Reading report and extracting clinical details...</span>
+            </div>
+
+            <!-- Agent Thinking Steps -->
+            <div class="agent-pipeline" id="agentPipeline" hidden>
+                <span class="agent-step" id="agentStep1">&#x1F50D; Scrubbing Data...</span>
+                <span class="agent-step-arrow">&#x2192;</span>
+                <span class="agent-step" id="agentStep2">&#x1F9E0; Checking for Clinical Gaps...</span>
+                <span class="agent-step-arrow">&#x2192;</span>
+                <span class="agent-step" id="agentStep3">&#x26A1; Routing to Gemini...</span>
+                <span class="agent-step-arrow">&#x2192;</span>
+                <span class="agent-step" id="agentStep4">&#x1F4E6; Building Packages...</span>
             </div>
 
             <div id="clinicalSummaryBlock" hidden>
@@ -623,6 +749,7 @@
 
                 <div class="button-row">
                     <button type="button" class="primary-btn" id="combineBtn" disabled>View Itinerary & Dossier</button>
+                    <button type="button" class="regenerate-btn" id="regenerateBtn">&#x1F504; Don\'t Like These? Regenerate</button>
                 </div>
             </div>
         </section>
@@ -1599,6 +1726,7 @@
             packages.forEach((pkg, index) => {
                 const card = document.createElement('div');
                 card.className = 'option-card';
+                card.dataset.hospital = pkg.specialist?.hospital || '';
                 
                 const hospital = pkg.specialist?.hospital || 'Hospital';
                 const specialist = pkg.specialist?.name || 'Specialist';
@@ -1646,61 +1774,24 @@
         });
 
         byId('proceedToLayersBtn').addEventListener('click', async () => {
-            if (!globalMedicalData || !currentCountry) return;
-
-            globalMedicalData.age_group = byId('age_group').value;
-            globalMedicalData.severity = byId('severity').value;
-            globalMedicalData.urgency = byId('urgency').value;
-
-            byId('step2').hidden = false;
-            byId('choicesArea').hidden = true;
-            
-            // Set AI Thinking animation text
-            byId('matchingLoadingText').innerHTML = '<span class="ai-thinking">Antigravity AI Agent is thinking...</span> analyzing your condition and calculating optimal matches...';
-            setLoading('loading2', true, 'Antigravity Agent: Re-ranking with clinical priorities...');
-            await new Promise(r => setTimeout(r, 800)); // Visual "thinking" delay
-            
-            selections.package = null;
-            byId('combineBtn').disabled = true;
-
-            const payload = {
-                medical_data: globalMedicalData,
-                origin_country: currentCountry.originCountry,
-                user_origin: currentCountry.originCountry,
-                budget_local: parseFloat(byId('budget').value || '5000'),
-                currency: currentCountry.currency,
-                preferred_month: byId('preferred_month') ? byId('preferred_month').value : 'Next Month',
-                preferred_language: byId('preferred_language') ? byId('preferred_language').value : 'English',
-                user_priority_preference: byId('user_priority_preference') ? byId('user_priority_preference').value : 'balanced',
-                manual_override: byId('manual_override_toggle') ? byId('manual_override_toggle').checked : false
-            };
-
-            try {
-                const response = await fetch(`${API_BASE}/api/v1/match-packages`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                
-                const data = await response.json();
-                if (!response.ok) throw new Error(data.detail || 'Matching failed');
-                
-                const packages = data.recommended_packages || [];
-                globalLogisticsData = data.logistics || {};
-
-                if (packages.length) {
-                    renderPackageGrid(packages);
-                } else {
-                    byId('packageGrid').innerHTML = '<div class="info-card"><div class="info-value">No packages could be orchestrated for this case.</div></div>';
-                }
-
-                byId('choicesArea').hidden = false;
-                window.scrollTo({ top: byId('step2').offsetTop - 12, behavior: 'smooth' });
-            } catch (error) {
-                alert(error.message);
-            } finally {
-                setLoading('loading2', false);
+            const medicalData = globalMedicalData || _pendingMedicalData;
+            if (!currentCountry) {
+                alert('Please select a country first.');
+                return;
             }
+            if (!medicalData) {
+                alert('Please analyze or load a medical report first.');
+                return;
+            }
+
+            medicalData.age_group = byId('age_group').value;
+            medicalData.severity = byId('severity').value;
+            medicalData.urgency = byId('urgency').value;
+            globalMedicalData = { ...medicalData };
+            _pendingMedicalData = { ...medicalData };
+            _sessionId = null;
+            _rejectedHospitals = [];
+            await runMatchPackages(_pendingMedicalData);
         });
 
         byId('combineBtn').addEventListener('click', async () => {
@@ -1857,6 +1948,236 @@
 
         renderCountryGrid();
         applyTranslations();
+        // ================================================================
+        // PRIVACY & AGENTIC SYSTEM — NEW JS
+        // ================================================================
+        
+        // State
+        let _sessionId = null;
+        let _rejectedHospitals = [];
+        let _pendingMedicalData = null;  // used for clarification loop
+
+        // Privacy Console Logger
+        function privacyLog(msg, type='info') {
+            const console = document.getElementById('privacyConsole');
+            const panel = document.getElementById('privacyPanel');
+            if (!panel || !console) return;
+            panel.hidden = false;
+            const classMap = { info: '', warn: 'log-warn', ok: 'log-ok', err: 'log-err', step: 'log-step' };
+            const ts = new Date().toLocaleTimeString();
+            const cls = classMap[type] || '';
+            console.innerHTML += `<div class="${cls}">[${ts}] ${msg}</div>`;
+            console.scrollTop = console.scrollHeight;
+        }
+
+        // Agent Steps
+        const AGENT_STEPS = ['agentStep1', 'agentStep2', 'agentStep3', 'agentStep4'];
+        function showAgentPipeline() {
+            const pipeline = document.getElementById('agentPipeline');
+            if (pipeline) pipeline.hidden = false;
+            AGENT_STEPS.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.className = 'agent-step';
+            });
+        }
+        function activateAgentStep(index) { // 0-based
+            AGENT_STEPS.forEach((id, i) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                if (i < index) el.className = 'agent-step done';
+                else if (i === index) el.className = 'agent-step active';
+                else el.className = 'agent-step';
+            });
+        }
+        function completeAgentSteps() {
+            AGENT_STEPS.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.className = 'agent-step done';
+            });
+        }
+
+        // Render privacy logs from backend response
+        function renderPrivacyLogs(logs) {
+            if (!logs || !logs.length) return;
+            logs.forEach(log => privacyLog(log, log.includes('Masking') ? 'warn' : 'ok'));
+        }
+
+        // Vietnam Mock Data
+        const VIETNAM_MOCK = {
+            condition: "Coronary Artery Disease with Diabetic Nephropathy",
+            sub_specialty_inference: "Cardiology",
+            severity: "High",
+            age_group: "Adult",
+            urgency: "Urgent",
+            is_cardio_oncology: false,
+            raw_summary: "Patient: PATIENT_HASH_A1B2 | Blood Test: FBG 12.8mmol/L [HIGH], HbA1c 9.4% [HIGH], Creatinine 198umol/L [HIGH], eGFR 34 [CKD Stage 3b]. ECG: ST-depression V4-V6, T-wave inversion aVL/V5, QTc 458ms. Diagnosis: Uncontrolled T2DM, Diabetic Nephropathy CKD3, Suspected CAD, Dyslipidemia. Recommend urgent cardiology + nephrology specialist referral to Malaysia."
+        };
+
+        // Load Vietnam Mock Button
+        document.getElementById('loadVietnamMockBtn').addEventListener('click', () => {
+            const privConsole = document.getElementById('privacyConsole');
+            if (privConsole) privConsole.innerHTML = '';
+
+            privacyLog('[SYSTEM]: Loading Vietnam Mock — Private Mode activated', 'step');
+            privacyLog('[PRIVACY]: Detected patient name: Nguyễn Văn A', 'warn');
+            privacyLog('[PRIVACY]: Masking PII for Nguyễn Văn A -> PATIENT_HASH_A1B2', 'warn');
+            privacyLog('[PRIVACY]: Masking exact DOB', 'warn');
+            privacyLog('[PRIVACY]: Masking Phone Numbers', 'warn');
+            privacyLog('[PRIVACY]: Raw clinical data scrubbed. Safe to send to Gemini API.', 'ok');
+            privacyLog('[ROUTING]: Sending translated text to Gemini 1.5 Flash (Localization Layer)', 'step');
+            privacyLog('[ROUTING]: Sending clinical summary to Gemini 3.0 Flash (Reasoning Layer)', 'step');
+
+            showAgentPipeline();
+            activateAgentStep(0);
+            setTimeout(() => activateAgentStep(1), 600);
+            setTimeout(() => activateAgentStep(2), 1400);
+            setTimeout(() => activateAgentStep(3), 2200);
+            setTimeout(() => completeAgentSteps(), 3000);
+
+            // Auto-select Vietnam country
+            const vnCountry = COUNTRIES.find(c => c.key === 'vietnam');
+            if (vnCountry && !currentCountry) {
+                selectCountry(vnCountry);
+            }
+
+            // Pre-fill form
+            document.getElementById('budget').value = 8000;
+            const langSelect = document.getElementById('preferred_language');
+            if (langSelect) langSelect.value = 'Vietnamese';
+
+            // Skip extract step, inject mock data directly
+            _pendingMedicalData = VIETNAM_MOCK;
+            globalMedicalData = { ...VIETNAM_MOCK };
+            _sessionId = 'mock_vn_' + Date.now();
+            _rejectedHospitals = [];
+
+            // Show clinical summary block
+            setTimeout(() => {
+                privacyLog('[AGENT]: Clinical data ready. Proceeding to match packages.', 'ok');
+                document.getElementById('step1').hidden = false;
+                document.getElementById('clinicalSummaryBlock').hidden = false;
+                document.getElementById('summaryAgeValue').textContent = VIETNAM_MOCK.age_group;
+                document.getElementById('summaryDiagnosisValue').textContent = VIETNAM_MOCK.condition;
+                document.getElementById('summaryUrgencyValue').textContent = '⚠️ ' + VIETNAM_MOCK.urgency + ' [PENDING REVIEW]';
+                document.getElementById('extractedData').textContent = JSON.stringify(VIETNAM_MOCK, null, 2);
+
+                const ageEl = document.getElementById('age_group');
+                if (ageEl) ageEl.value = VIETNAM_MOCK.age_group;
+                const sevEl = document.getElementById('severity');
+                if (sevEl) sevEl.value = VIETNAM_MOCK.severity;
+                const urgEl = document.getElementById('urgency');
+                if (urgEl) urgEl.value = VIETNAM_MOCK.urgency;
+            }, 3200);
+        });
+
+        // Clarification submit handler
+        document.getElementById('submitClarificationBtn').addEventListener('click', async () => {
+            const answer = document.getElementById('clarificationInput').value.trim();
+            if (!answer) return;
+            
+            privacyLog('[AGENT]: Clarification received. Re-running match with enriched data...', 'ok');
+            document.getElementById('clarificationPanel').hidden = true;
+            
+            // Inject the answer into medical data as a note
+            if (_pendingMedicalData) {
+                _pendingMedicalData.raw_summary = (_pendingMedicalData.raw_summary || '') + ' ' + answer;
+            }
+            
+            await runMatchPackages(_pendingMedicalData);
+        });
+
+        // Regenerate handler
+        document.getElementById('regenerateBtn').addEventListener('click', async () => {
+            if (!_pendingMedicalData) return;
+
+            // Collect current hospital names to reject
+            const currentPkgs = document.querySelectorAll('.option-card[data-hospital]');
+            currentPkgs.forEach(el => {
+                const h = el.getAttribute('data-hospital');
+                if (h && !_rejectedHospitals.includes(h)) _rejectedHospitals.push(h);
+            });
+
+            privacyLog(`[MEMORY]: Marking ${_rejectedHospitals.length} hospital(s) as rejected. Fetching new matches...`, 'step');
+            await runMatchPackages(_pendingMedicalData);
+        });
+
+        // Run match packages (shared by normal flow, clarification, and regenerate)
+        async function runMatchPackages(medicalData) {
+            const origin = currentCountry ? currentCountry.originCountry : 'Vietnam';
+            const budget = parseFloat(document.getElementById('budget').value) || 5000;
+            const currency = currentCountry ? currentCountry.currency : 'USD';
+            const language = document.getElementById('preferred_language')?.value || 'English';
+            const priority = document.getElementById('user_priority_preference')?.value || 'balanced';
+            const override = document.getElementById('manual_override_toggle')?.checked || false;
+            const month = document.getElementById('preferred_month')?.value || 'Next Month';
+
+            _pendingMedicalData = { ...(medicalData || {}) };
+            document.getElementById('step2').hidden = false;
+            document.getElementById('loading2').classList.add('visible');
+            document.getElementById('choicesArea').hidden = true;
+            document.getElementById('matchingLoadingText').innerHTML = '<span class="ai-thinking">Antigravity AI Agent is thinking...</span> analyzing your condition and calculating optimal matches...';
+            activateAgentStep(3);
+            selections.package = null;
+            byId('combineBtn').disabled = true;
+
+            try {
+                const res = await fetch(`${API_BASE}/api/v1/match-packages`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        medical_data: medicalData,
+                        origin_country: origin,
+                        user_origin: origin,
+                        budget_local: budget,
+                        currency: currency,
+                        preferred_month: month,
+                        preferred_language: language,
+                        user_priority_preference: priority,
+                        manual_override: override,
+                        session_id: _sessionId,
+                        rejected_hospitals: _rejectedHospitals,
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Matching failed');
+
+                // Handle clarification loop
+                if (data.clarification_required) {
+                    _sessionId = data.session_id;
+                    document.getElementById('step2').hidden = true;
+                    document.getElementById('clarificationPanel').hidden = false;
+                    document.getElementById('clarificationQuestion').textContent = data.clarification_question || data.missing_detail;
+                    _pendingMedicalData = medicalData;
+                    privacyLog(`[AGENT]: Clarification needed — ${data.missing_detail}`, 'warn');
+                    return;
+                }
+
+                _sessionId = data.session_id || _sessionId;
+                globalLogisticsData = data.logistics || {};
+
+                // Show match status
+                if (data.match_status === 'pending') {
+                    privacyLog('[HITL]: High Urgency detected — match marked as PENDING for doctor review.', 'warn');
+                }
+                completeAgentSteps();
+
+                document.getElementById('loading2').classList.remove('visible');
+                document.getElementById('choicesArea').hidden = false;
+                
+                const packages = data.recommended_packages || [];
+                if (packages.length) {
+                    renderPackageGrid(packages);
+                } else {
+                    byId('packageGrid').innerHTML = '<div class="info-card"><div class="info-value">No packages could be orchestrated for this case.</div></div>';
+                }
+                window.scrollTo({ top: byId('step2').offsetTop - 12, behavior: 'smooth' });
+
+            } catch (err) {
+                privacyLog(`[ERROR]: ${err.message}`, 'err');
+                document.getElementById('loading2').classList.remove('visible');
+            }
+        }
+
     </script>
 </body>
 </html>

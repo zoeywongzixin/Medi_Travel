@@ -1,16 +1,15 @@
-import ollama
+import re
+from utils.llm import call_gemini
 
 def translate_medical_text(raw_text):
     """Translate medical text to clear English. NO JSON."""
-    
     system_prompt = (
         "You are a medical translator. "
         "Translate the provided OCR text into clear, readable English. "
         "Fix any obvious OCR typos (like 'Lurigs' to 'Lungs'). "
         "Return ONLY the translated English text, and nothing else. No introductions or apologies."
     )
-    
-    return _call_ollama(system_prompt, raw_text)
+    return _call_llm(system_prompt, raw_text)
 
 def translate_template_text(template_str, target_language):
     """Translate a medical template to target language, keeping placeholders."""
@@ -19,8 +18,7 @@ def translate_template_text(template_str, target_language):
         "Keep {{placeholders}} exactly as they are. "
         "Return ONLY the translated string."
     )
-    return _call_ollama(system_prompt, template_str)
-
+    return _call_llm(system_prompt, template_str)
 
 def translate_text(text, target_language):
     """Translate general display text to the chosen language."""
@@ -29,8 +27,7 @@ def translate_text(text, target_language):
         "Preserve medical terms, hospital names, charity names, codes, acronyms, and numbers when appropriate. "
         "Return ONLY the translated text."
     )
-    return _call_ollama(system_prompt, text)
-
+    return _call_llm(system_prompt, text)
 
 def translate_document_text(document_str, target_language):
     """
@@ -52,23 +49,13 @@ def translate_document_text(document_str, target_language):
         "Preserve hospital names, charity names, acronyms, reference codes, and numbers when appropriate. "
         "Return ONLY the translated document."
     )
-    translated = _call_ollama(system_prompt, protected_text)
+    translated = _call_llm(system_prompt, protected_text)
 
     for token, original_line in protected_lines:
         translated = translated.replace(token, original_line)
     return translated
 
-def _call_ollama(system_prompt, user_content):
-    response = ollama.chat(
-        model='llama3.2:3b',
-        messages=[
-            {'role': 'system', 'content': system_prompt},
-            {'role': 'user', 'content': user_content}
-        ],
-        options={'temperature': 0}
-    )
-    
-    # Handle both old (dict) and new (object) Ollama response formats
-    if hasattr(response, 'message'):
-        return response.message.content
-    return response['message']['content']
+def _call_llm(system_prompt, user_content):
+    res = call_gemini(system_prompt, user_content, model_name="gemini-1.5-flash")
+    text = res.get("text", "").strip()
+    return text or user_content

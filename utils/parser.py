@@ -1,8 +1,8 @@
 import re
 import json
-import ollama
 from pydantic import BaseModel, Field
 from typing import Optional
+from utils.llm import call_gemini
 
 class MedicalRecord(BaseModel):
     condition: str = Field(default="Unknown")
@@ -14,11 +14,62 @@ class MedicalRecord(BaseModel):
     raw_summary: Optional[str] = Field(default="")
 
 
+def _heuristic_sub_specialty(text: str) -> str:
+    lowered = (text or "").lower()
+    if any(term in lowered for term in ("small cell lung cancer", "lung cancer", "sclc", "ung thư", "un g thu", "phổi", "pho i")):
+        if any(term in lowered for term in ("radiotherapy", "xạ trị", "xa tri")):
+            return "Radiation Oncology"
+        return "Medical Oncology"
+    if any(term in lowered for term in ("heart", "coronary", "cardio", "jantung")):
+        return "Cardiology"
+    if any(term in lowered for term in ("kidney", "renal", "nephro")):
+        return "Nephrology"
+    return "General Medicine"
+
+
+def _heuristic_condition(text: str) -> str:
+    lowered = (text or "").lower()
+    if any(term in lowered for term in ("small cell lung cancer", "sclc")):
+        return "Small Cell Lung Cancer"
+    if any(term in lowered for term in ("lung cancer", "ung thư", "un g thu", "phổi", "pho i")):
+        return "Lung Cancer"
+    if any(term in lowered for term in ("coronary artery disease", "cad")):
+        return "Coronary Artery Disease"
+    if any(term in lowered for term in ("chronic kidney disease", "ckd")):
+        return "Chronic Kidney Disease"
+    return "General Medicine"
+
+
+def _heuristic_severity(text: str) -> str:
+    lowered = (text or "").lower()
+    if any(term in lowered for term in ("critical", "icu", "ventilator")):
+        return "Critical"
+    if any(term in lowered for term in ("cancer", "ung thư", "un g thu", "hemoptysis", "máu", "mau", "radiotherapy", "xạ trị", "xa tri")):
+        return "High"
+    return "Moderate"
+
+
+def _heuristic_medical_record(text: str) -> dict:
+    severity = _heuristic_severity(text)
+    condition = _heuristic_condition(text)
+    return {
+        "condition": condition,
+        "sub_specialty_inference": _heuristic_sub_specialty(text),
+        "severity": severity,
+        "age_group": infer_age_group(text),
+        "urgency": infer_urgency(text, severity),
+        "is_cardio_oncology": "cardio" in (text or "").lower() and condition in {"Lung Cancer", "Small Cell Lung Cancer"},
+        "raw_summary": (text or "").strip()[:1000],
+    }
+
+
 def infer_age_group(text: str) -> str:
     if not text:
         return "Unknown"
 
     age_match = re.search(r"\bage\s*[:\-]?\s*(\d{1,3})\b", text, re.IGNORECASE)
+    if not age_match:
+        age_match = re.search(r"tu[oô]i\s*[:\-]?\s*(\d{1,3})", text, re.IGNORECASE)
     if age_match:
         age = int(age_match.group(1))
         if age <= 1:
@@ -73,6 +124,16 @@ def infer_urgency(text: str, severity: str = "") -> str:
         "coughing blood",
         "rapid weight loss",
         "chest pain",
+        "ung thư",
+        "un g thu",
+        "xạ trị",
+        "xa tri",
+        "hóa trị",
+        "hoa tri",
+        "sụt cân",
+        "sut can",
+        "đờm lẫn máu",
+        "dom lan mau",
     )
 
     if any(term in lowered for term in critical_terms):
@@ -81,10 +142,10 @@ def infer_urgency(text: str, severity: str = "") -> str:
         return "Urgent"
     return "Stable"
 
+
 def get_concise_json(english_text):
-    """Uses Llama 3.2 to structure the translated text into a valid JSON."""
-    MODEL_NAME = 'llama3.2:3b' 
-    content = "" # Initialize empty so the except block doesn't crash
+    """Uses Gemini 3.0 Flash to structure translated text into a valid JSON."""
+    content = ""
 
     system_prompt = (
         "You are a strict medical data extractor for a medical tourism app. "
@@ -103,44 +164,26 @@ def get_concise_json(english_text):
     )
 
     try:
-        # Check if we even have text to send
         if not english_text or len(english_text.strip()) < 5:
             raise ValueError("English text is empty or too short for AI processing.")
 
-        response = ollama.chat(
-            model=MODEL_NAME,
-            format='json', 
-            messages=[
-                {'role': 'system', 'content': system_prompt},
-                {'role': 'user', 'content': f"Extract info from this text: {english_text}"}
-            ],
-            options={'temperature': 0}
-        )
-        
-        # Handle both old (dict) and new (object) Ollama response formats
-        if hasattr(response, 'message'):
-            content = response.message.content.strip()
-        else:
-            content = response['message']['content'].strip()
-        
-        # --- FIX: REGEX EXTRACTION ---
+        res = call_gemini(system_prompt, f"Extract info from this text: {english_text}", model_name="gemini-2.0-flash")
+        content = res.get("text", "").strip()
+
+        # Extract JSON block
         json_match = re.search(r'\{.*\}', content, re.DOTALL)
         clean_json = json_match.group(0) if json_match else content
-            
-        # 2. Convert string to a Python Dictionary
+
         temp_data = json.loads(clean_json)
-        
-        # 3. SELF-CORRECTION: Handle the Boolean bug
+
+        # Self-correction: normalise booleans and inferred fields
         val = temp_data.get("is_cardio_oncology")
         temp_data["is_cardio_oncology"] = str(val).lower() in ("true", "1", "yes")
         temp_data["age_group"] = temp_data.get("age_group") or infer_age_group(english_text)
         temp_data["urgency"] = temp_data.get("urgency") or infer_urgency(
-            english_text,
-            temp_data.get("severity", ""),
+            english_text, temp_data.get("severity", "")
         )
 
-        # 4. Final Validation with Pydantic
-        # Ensure MedicalRecord is imported/defined above this function
         validated = MedicalRecord.model_validate(temp_data).model_dump()
 
         if validated.get("age_group") in ("Unknown", "", None):
@@ -151,52 +194,37 @@ def get_concise_json(english_text):
         return validated
 
     except Exception as e:
-        print(f"\n--- ❌ PARSER ERROR LOG ---")
+        print(f"\n--- [PARSER ERROR LOG] ---")
         print(f"Error Type: {type(e).__name__}")
         print(f"Error Message: {str(e)}")
         if content:
             print(f"Raw AI Content: {content[:100]}...")
         print(f"---------------------------\n")
-        
-        # Return a dictionary that matches your Pydantic schema so the pipeline can continue
-        return {
-            "condition": "Extraction Error",
-            "sub_specialty_inference": "General",
-            "severity": "Unknown",
-            "age_group": "Unknown",
-            "urgency": "Unknown",
-            "is_cardio_oncology": False,
-            "raw_summary": f"Failed: {str(e)}"
-        }
-    
+
+        fallback = _heuristic_medical_record(english_text or "")
+        fallback["raw_summary"] = fallback.get("raw_summary") or f"Failed: {str(e)}"
+        return fallback
+
+
 def scrub_pii(data):
     """Privacy layer to remove sensitive dates and phone numbers."""
     for key, value in data.items():
         if isinstance(value, str):
-            # Mask common patterns (Dates and Phone numbers)
             value = re.sub(r'\d{2}/\d{2}/\d{4}', '[REDACTED_DATE]', value)
             value = re.sub(r'\+?\d{10,12}', '[REDACTED_PHONE]', value)
             data[key] = value
     return data
 
+
 def scrub_raw_text(text: str) -> str:
     """Aggressively scrubs raw OCR text to prevent AI safety filters from triggering."""
     if not text:
         return text
-        
-    # Mask variations of addresses
+
     text = re.sub(r'(?i)ad\s*dress[es]*.*?[\n\r]', '[REDACTED_ADDRESS]\n', text)
-    
-    # Mask License Numbers
     text = re.sub(r'(?i)license\s*number.*?[\n\r]', '[REDACTED_LICENSE]\n', text)
-    
-    # Mask patient greetings
     text = re.sub(r'(?i)dear\s+(mr|ms|mrs|dr|me).*?[\n\r:]', 'Dear [REDACTED_NAME]:\n', text)
-    
-    # Generic long numbers (Phones, IDs)
     text = re.sub(r'\+?\d{8,15}', '[REDACTED_NUMBER]', text)
-    
-    # Dates
     text = re.sub(r'\d{2}[-/\.]\d{2}[-/\.]\d{4}', '[REDACTED_DATE]', text)
-    
+
     return text

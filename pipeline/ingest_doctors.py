@@ -18,6 +18,7 @@ MMC_SEARCH_URL = f"{MMC_BASE_URL}/search/registeredDoctor"
 DEFAULT_TIMEOUT = 20
 DEFAULT_MAX_PAGES = int(os.getenv("MMC_MAX_PAGES_PER_QUERY", "2"))
 DEFAULT_MAX_DOCTORS_PER_QUERY = int(os.getenv("MMC_MAX_DOCTORS_PER_QUERY", "15"))
+DEFAULT_DETAIL_TIMEOUT = int(os.getenv("MMC_DETAIL_TIMEOUT", str(DEFAULT_TIMEOUT)))
 DEFAULT_SEARCH_TERMS = [
     "ONKOLOGI",
     "KANSER",
@@ -29,8 +30,13 @@ DEFAULT_SEARCH_TERMS = [
 ]
 
 
-def fetch_html(session: requests.Session, url: str, params: Optional[Dict] = None) -> str:
-    response = session.get(url, params=params, timeout=DEFAULT_TIMEOUT)
+def fetch_html(
+    session: requests.Session,
+    url: str,
+    params: Optional[Dict] = None,
+    timeout: int = DEFAULT_TIMEOUT,
+) -> str:
+    response = session.get(url, params=params, timeout=timeout)
     response.raise_for_status()
     return response.text
 
@@ -230,7 +236,17 @@ def scrape_mmc_doctors(
     for term in search_terms or DEFAULT_SEARCH_TERMS:
         collected = 0
         for page in range(1, max_pages_per_query + 1):
-            html = fetch_html(session, MMC_SEARCH_URL, params={"place-of-practice": term, "page": page})
+            try:
+                html = fetch_html(
+                    session,
+                    MMC_SEARCH_URL,
+                    params={"place-of-practice": term, "page": page},
+                    timeout=DEFAULT_TIMEOUT,
+                )
+            except requests.RequestException as exc:
+                print(f"MMC query '{term}' page {page} failed: {exc}")
+                break
+
             results = parse_search_results(html)
             if not results:
                 break
@@ -239,7 +255,15 @@ def scrape_mmc_doctors(
                 if collected >= max_doctors_per_query:
                     break
                 result["matched_query"] = term
-                detail_html = fetch_html(session, result["detail_url"])
+                try:
+                    detail_html = fetch_html(
+                        session,
+                        result["detail_url"],
+                        timeout=DEFAULT_DETAIL_TIMEOUT,
+                    )
+                except requests.RequestException as exc:
+                    print(f"  Skipping doctor detail for '{result.get('name', 'Unknown')}' due to request failure: {exc}")
+                    continue
                 profile = build_doctor_profile(result, detail_html)
                 unique_key = (
                     profile.get("full_registration_number")
@@ -289,6 +313,10 @@ def build_vector_document(doc_data: Dict) -> str:
 
 def ingest_to_chroma(doctors: List[Dict]) -> None:
     print("Connecting to ChromaDB...")
+
+    if not doctors:
+        print("No doctors were scraped. Existing 'malaysia_doctors' collection was left unchanged.")
+        return
 
     db_path = os.path.join(os.path.dirname(__file__), "..", "data", "chroma_db")
     os.makedirs(db_path, exist_ok=True)

@@ -201,9 +201,6 @@ def match_hospitals(medical_data: Dict, retrieval_mode: str = "default", top_n: 
     # -----------------------------------------------------------------------
     print("  [MedicalAgent] Stage 2: Applying Hard Specialty Gate...")
     
-    # DELETE OR COMMENT OUT THE LINE BELOW:
-    # from agents.medical_agent import _hard_group_gate, rank_doctor_matches 
-    
     candidates = _hard_group_gate(candidates, profile["groups"])
 
     print("  [MedicalAgent] Stage 3: Running Metadata-Enriched Scoring...")
@@ -233,6 +230,7 @@ def get_mock_hospitals(medical_data: Dict = None):
 
     if any(term in text for term in ("lung", "oncology", "cancer", "tumor", "tumour", "sclc", "radiotherapy", "chemotherapy")):
         return [
+            # Group 1
             {
                 'name': 'Dr. Aisyah Marina Mohd Noor',
                 'hospital': 'National Cancer Institute (IKN)',
@@ -262,10 +260,73 @@ def get_mock_hospitals(medical_data: Dict = None):
                 'hospital_location': 'Kuala Lumpur, Malaysia',
                 'grant_availability': 'Medium',
                 'hospital_metadata': {'Grant Availability': 'Medium', 'grant_cap_usd': 320},
+            },
+            # Group 2
+            {
+                'name': 'Dr. Siti Nurhaliza',
+                'hospital': 'Gleneagles Kuala Lumpur',
+                'specialty': 'Thoracic Oncology',
+                'specialty_tags': 'Thoracic Oncology, Lung Mass',
+                'tier': 'Premium Private',
+                'hospital_location': 'Kuala Lumpur, Malaysia',
+                'grant_availability': 'Low',
+                'hospital_metadata': {'Grant Availability': 'Low', 'grant_cap_usd': 180},
+            },
+            {
+                'name': 'Dr. Lim Chong Wei',
+                'hospital': 'Prince Court Medical Centre',
+                'specialty': 'Pulmonology',
+                'specialty_tags': 'Pulmonology, Respiratory Oncology Support',
+                'tier': 'Premium Private',
+                'hospital_location': 'Kuala Lumpur, Malaysia',
+                'grant_availability': 'Low',
+                'hospital_metadata': {'Grant Availability': 'Low', 'grant_cap_usd': 180},
+            },
+            {
+                'name': 'Dr. Rahmat Abdullah',
+                'hospital': 'Hospital Kuala Lumpur',
+                'specialty': 'Medical Oncology',
+                'specialty_tags': 'Medical Oncology, Lung Cancer',
+                'tier': 'Government / Semi-Gov',
+                'hospital_location': 'Kuala Lumpur, Malaysia',
+                'grant_availability': 'High',
+                'hospital_metadata': {'Grant Availability': 'High', 'grant_cap_usd': 500},
+            },
+            # Group 3
+            {
+                'name': 'Dr. Wei Ling',
+                'hospital': 'Penang Adventist Hospital',
+                'specialty': 'Radiation Oncology',
+                'specialty_tags': 'Radiation Oncology, Radiotherapy',
+                'tier': 'Standard Private',
+                'hospital_location': 'Penang, Malaysia',
+                'grant_availability': 'High',
+                'hospital_metadata': {'Grant Availability': 'High', 'grant_cap_usd': 450},
+            },
+            {
+                'name': 'Dr. Azman Shah',
+                'hospital': 'Pantai Hospital Kuala Lumpur',
+                'specialty': 'Medical Oncology',
+                'specialty_tags': 'Medical Oncology, Chemotherapy',
+                'tier': 'Standard Private',
+                'hospital_location': 'Kuala Lumpur, Malaysia',
+                'grant_availability': 'Medium',
+                'hospital_metadata': {'Grant Availability': 'Medium', 'grant_cap_usd': 275},
+            },
+            {
+                'name': 'Dr. Kamal Hasan',
+                'hospital': 'Mahkota Medical Centre',
+                'specialty': 'Pulmonology',
+                'specialty_tags': 'Pulmonology, Hemoptysis',
+                'tier': 'Standard Private',
+                'hospital_location': 'Malacca, Malaysia',
+                'grant_availability': 'Medium',
+                'hospital_metadata': {'Grant Availability': 'Medium', 'grant_cap_usd': 275},
             }
         ]
 
     return [
+        # Group 1
         {
             'name': 'Dr. Mock Elite',
             'hospital': 'Gleneagles Kuala Lumpur',
@@ -295,6 +356,68 @@ def get_mock_hospitals(medical_data: Dict = None):
             'hospital_location': 'Penang, Malaysia',
             'grant_availability': 'High',
             'hospital_metadata': {'Grant Availability': 'High', 'grant_cap_usd': 450},
+        },
+        # Group 2
+        {
+            'name': 'Dr. John Doe',
+            'hospital': 'Prince Court Medical Centre',
+            'specialty': 'Orthopedics',
+            'specialty_tags': 'Hip Replacement',
+            'tier': 'Premium Private',
+            'hospital_location': 'Kuala Lumpur, Malaysia',
+            'grant_availability': 'Low',
+            'hospital_metadata': {'Grant Availability': 'Low', 'grant_cap_usd': 180},
+        },
+        {
+            'name': 'Dr. Jane Smith',
+            'hospital': 'Pantai Hospital Kuala Lumpur',
+            'specialty': 'Orthopedics',
+            'specialty_tags': 'Spine Surgery',
+            'tier': 'Standard Private',
+            'hospital_location': 'Kuala Lumpur, Malaysia',
+            'grant_availability': 'Medium',
+            'hospital_metadata': {'Grant Availability': 'Medium', 'grant_cap_usd': 275},
+        },
+        {
+            'name': 'Dr. Ahmad bin Ali',
+            'hospital': 'Hospital Kuala Lumpur',
+            'specialty': 'Orthopedics',
+            'specialty_tags': 'Joint Replacement',
+            'tier': 'Government / Semi-Gov',
+            'hospital_location': 'Kuala Lumpur, Malaysia',
+            'grant_availability': 'High',
+            'hospital_metadata': {'Grant Availability': 'High', 'grant_cap_usd': 500},
+        },
+        # Group 3
+        {
+            'name': 'Dr. Michael Chen',
+            'hospital': 'Mahkota Medical Centre',
+            'specialty': 'Orthopedics',
+            'specialty_tags': 'Sports Medicine',
+            'tier': 'Standard Private',
+            'hospital_location': 'Malacca, Malaysia',
+            'grant_availability': 'Medium',
+            'hospital_metadata': {'Grant Availability': 'Medium', 'grant_cap_usd': 275},
+        },
+        {
+            'name': 'Dr. Sarah Lee',
+            'hospital': 'KPJ Johor Specialist Hospital',
+            'specialty': 'Orthopedics',
+            'specialty_tags': 'Orthopedic Surgery',
+            'tier': 'Standard Private',
+            'hospital_location': 'Johor Bahru, Malaysia',
+            'grant_availability': 'Medium',
+            'hospital_metadata': {'Grant Availability': 'Medium', 'grant_cap_usd': 275},
+        },
+        {
+            'name': 'Dr. David Wong',
+            'hospital': 'Subang Jaya Medical Centre',
+            'specialty': 'Orthopedics',
+            'specialty_tags': 'Joint Replacement',
+            'tier': 'Standard Private',
+            'hospital_location': 'Kuala Lumpur, Malaysia',
+            'grant_availability': 'Medium',
+            'hospital_metadata': {'Grant Availability': 'Medium', 'grant_cap_usd': 320},
         }
     ]
 

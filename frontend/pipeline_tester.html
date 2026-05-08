@@ -562,9 +562,18 @@
         <header class="header">
             <h1 class="title" id="appTitle">ASEAN Medical Match</h1>
             <p class="subtitle" id="appSubtitle">Lead Orchestrator v2.0 - Production-grade agentic system with Privacy Shield.</p>
-            <div style="margin-top:20px; display:flex; gap:10px;">
-                <button type="button" id="loadVietnamMockBtn" style="background:linear-gradient(135deg,#d32f2f,#b71c1c);color:#fff;padding:12px 20px;border-radius:8px;border:none;font-weight:bold;cursor:pointer;display:flex;align-items:center;gap:10px;box-shadow:0 4px 15px rgba(183,28,28,0.3);transition:transform 0.2s;">
-                    <span style="font-size:1.4rem;">&#x1F1FB;&#x1F1F3;</span> Load Vietnam Mock (Private Mode)
+            <div style="margin-top:20px; display:flex; gap:10px; flex-wrap:wrap;">
+                <button type="button" id="loadVietnamMockBtn" class="mock-case-btn" data-mock-case="vietnam_cardiorenal" style="background:linear-gradient(135deg,#d32f2f,#b71c1c);color:#fff;padding:12px 20px;border-radius:8px;border:none;font-weight:bold;cursor:pointer;display:flex;align-items:center;gap:10px;box-shadow:0 4px 15px rgba(183,28,28,0.3);transition:transform 0.2s;">
+                    <span style="font-size:1.4rem;">&#x1F1FB;&#x1F1F3;</span> Vietnam Cardio-Renal Mock
+                </button>
+                <button type="button" class="mock-case-btn" data-mock-case="vietnam_sclc" style="background:linear-gradient(135deg,#0f766e,#115e59);color:#fff;padding:12px 20px;border-radius:8px;border:none;font-weight:bold;cursor:pointer;display:flex;align-items:center;gap:10px;box-shadow:0 4px 15px rgba(15,118,110,0.3);transition:transform 0.2s;">
+                    <span style="font-size:1.4rem;">&#x1F1FB;&#x1F1F3;</span> Vietnam SCLC Mock
+                </button>
+                <button type="button" class="mock-case-btn" data-mock-case="indonesia_cardiorenal" style="background:linear-gradient(135deg,#1d4ed8,#1e3a8a);color:#fff;padding:12px 20px;border-radius:8px;border:none;font-weight:bold;cursor:pointer;display:flex;align-items:center;gap:10px;box-shadow:0 4px 15px rgba(29,78,216,0.3);transition:transform 0.2s;">
+                    <span style="font-size:1.4rem;">&#x1F1EE;&#x1F1E9;</span> Indonesia Cardio-Renal Mock
+                </button>
+                <button type="button" class="mock-case-btn" data-mock-case="cambodia_oncology" style="background:linear-gradient(135deg,#b45309,#92400e);color:#fff;padding:12px 20px;border-radius:8px;border:none;font-weight:bold;cursor:pointer;display:flex;align-items:center;gap:10px;box-shadow:0 4px 15px rgba(180,83,9,0.3);transition:transform 0.2s;">
+                    <span style="font-size:1.4rem;">&#x1F1F0;&#x1F1ED;</span> Cambodia Oncology Mock
                 </button>
             </div>
         </header>
@@ -748,6 +757,7 @@
                 </div>
 
                 <div class="button-row">
+                    <button type="button" class="secondary-btn" id="backToStep1Btn">Back to Medical Report</button>
                     <button type="button" class="primary-btn" id="combineBtn" disabled>View Itinerary & Dossier</button>
                     <button type="button" class="regenerate-btn" id="regenerateBtn">&#x1F504; Don\'t Like These? Regenerate</button>
                 </div>
@@ -812,6 +822,7 @@
                 </details>
 
                 <div class="button-row">
+                    <button type="button" class="secondary-btn" id="backToStep2Btn">Back to Packages</button>
                     <button type="button" class="secondary-btn" id="restartBtn">Start new case</button>
                 </div>
             </div>
@@ -1946,6 +1957,15 @@
         byId('dlVisaBtn').addEventListener('click', () => previewLetter('visa_support'));
         byId('restartBtn').addEventListener('click', () => window.location.reload());
 
+        byId('backToStep1Btn').addEventListener('click', () => {
+            window.scrollTo({ top: byId('step1').offsetTop - 12, behavior: 'smooth' });
+        });
+
+        byId('backToStep2Btn').addEventListener('click', () => {
+            byId('step3').hidden = true;
+            window.scrollTo({ top: byId('step2').offsetTop - 12, behavior: 'smooth' });
+        });
+
         renderCountryGrid();
         applyTranslations();
         // ================================================================
@@ -1956,6 +1976,7 @@
         let _sessionId = null;
         let _rejectedHospitals = [];
         let _pendingMedicalData = null;  // used for clarification loop
+        let _previousPackages = []; // stores last valid packages for memory
 
         // Privacy Console Logger
         function privacyLog(msg, type='info') {
@@ -2013,6 +2034,115 @@
             raw_summary: "Patient: PATIENT_HASH_A1B2 | Blood Test: FBG 12.8mmol/L [HIGH], HbA1c 9.4% [HIGH], Creatinine 198umol/L [HIGH], eGFR 34 [CKD Stage 3b]. ECG: ST-depression V4-V6, T-wave inversion aVL/V5, QTc 458ms. Diagnosis: Uncontrolled T2DM, Diabetic Nephropathy CKD3, Suspected CAD, Dyslipidemia. Recommend urgent cardiology + nephrology specialist referral to Malaysia."
         };
 
+        const EXTRA_MOCK_CASES = {
+            vietnam_sclc: {
+                label: 'Vietnam SCLC Mock',
+                patientName: 'Nguyen Van Minh',
+                patientHash: 'PATIENT_HASH_SCLC9',
+                countryKey: 'vietnam',
+                budget: 9500,
+                language: 'Vietnamese',
+                data: {
+                    condition: "Small Cell Lung Cancer (SCLC)",
+                    sub_specialty_inference: "Oncology",
+                    severity: "High",
+                    age_group: "Adult",
+                    urgency: "Urgent",
+                    is_cardio_oncology: false,
+                    stage: "Limited Stage",
+                    cancer_stage: "Limited Stage",
+                    raw_summary: "Patient: PATIENT_HASH_SCLC9 | Persistent cough with hemoptysis, right upper lobe mass, rapid weight loss. Diagnosis: Small Cell Lung Cancer, limited stage. Requires urgent thoracic oncology review, chemotherapy, and radiotherapy planning. Wheelchair assistance requested for airport transfer."
+                }
+            },
+            indonesia_cardiorenal: {
+                label: 'Indonesia Cardio-Renal Mock',
+                patientName: 'Budi Santoso',
+                patientHash: 'PATIENT_HASH_ID77',
+                countryKey: 'indonesia',
+                budget: 7000,
+                language: 'Indonesian',
+                data: {
+                    condition: "Coronary Artery Disease with Chronic Kidney Disease",
+                    sub_specialty_inference: "Cardiology",
+                    severity: "High",
+                    age_group: "Adult",
+                    urgency: "Urgent",
+                    is_cardio_oncology: false,
+                    raw_summary: "Patient: PATIENT_HASH_ID77 | Unstable angina, diabetic nephropathy, creatinine 2.1 mg/dL, eGFR 33, HbA1c 9.2%. ECG with lateral ST depression. Needs interventional cardiology plus nephrology review in Malaysia. Wheelchair support needed at airport."
+                }
+            },
+            cambodia_oncology: {
+                label: 'Cambodia Oncology Mock',
+                patientName: 'Srey Pov',
+                patientHash: 'PATIENT_HASH_KH55',
+                countryKey: 'cambodia',
+                budget: 6000,
+                language: 'Khmer',
+                data: {
+                    condition: "Suspected Lung Cancer requiring oncology workup",
+                    sub_specialty_inference: "Oncology",
+                    severity: "High",
+                    age_group: "Adult",
+                    urgency: "Urgent",
+                    is_cardio_oncology: false,
+                    raw_summary: "Patient: PATIENT_HASH_KH55 | Right lung mass on CT, hemoptysis, chest pain, weight loss, weakness. Requires bronchoscopy, pathology confirmation, and urgent oncology planning in Malaysia."
+                }
+            }
+        };
+
+        function injectMockCase(mockCase) {
+            if (!mockCase) return;
+            const privConsole = document.getElementById('privacyConsole');
+            if (privConsole) privConsole.innerHTML = '';
+
+            privacyLog(`[SYSTEM]: Loading ${mockCase.label} - Private Mode activated`, 'step');
+            privacyLog(`[PRIVACY]: Detected patient name: ${mockCase.patientName}`, 'warn');
+            privacyLog(`[PRIVACY]: Masking PII for ${mockCase.patientName} -> ${mockCase.patientHash}`, 'warn');
+            privacyLog('[PRIVACY]: Masking exact DOB', 'warn');
+            privacyLog('[PRIVACY]: Masking Phone Numbers', 'warn');
+            privacyLog('[PRIVACY]: Raw clinical data scrubbed. Safe to send to Gemini API.', 'ok');
+            privacyLog('[ROUTING]: Sending translated text to Gemini 1.5 Flash (Localization Layer)', 'step');
+            privacyLog('[ROUTING]: Sending clinical summary to Gemini 3.0 Flash (Reasoning Layer)', 'step');
+
+            showAgentPipeline();
+            activateAgentStep(0);
+            setTimeout(() => activateAgentStep(1), 600);
+            setTimeout(() => activateAgentStep(2), 1400);
+            setTimeout(() => activateAgentStep(3), 2200);
+            setTimeout(() => completeAgentSteps(), 3000);
+
+            const selectedMockCountry = COUNTRIES.find(c => c.key === mockCase.countryKey);
+            if (selectedMockCountry) {
+                selectCountry(selectedMockCountry);
+            }
+
+            document.getElementById('budget').value = mockCase.budget;
+            const langSelect = document.getElementById('preferred_language');
+            if (langSelect) langSelect.value = mockCase.language;
+
+            _pendingMedicalData = { ...mockCase.data };
+            globalMedicalData = { ...mockCase.data };
+            _sessionId = `mock_${mockCase.countryKey}_${Date.now()}`;
+            _rejectedHospitals = [];
+
+            setTimeout(() => {
+                privacyLog('[AGENT]: Clinical data ready. Proceeding to match packages.', 'ok');
+                document.getElementById('step1').hidden = false;
+                document.getElementById('clinicalSummaryBlock').hidden = false;
+                document.getElementById('summaryAgeValue').textContent = mockCase.data.age_group;
+                document.getElementById('summaryDiagnosisValue').textContent = mockCase.data.condition;
+                document.getElementById('summaryUrgencyValue').textContent = 'PENDING REVIEW: ' + mockCase.data.urgency;
+                document.getElementById('extractedData').textContent = JSON.stringify(mockCase.data, null, 2);
+
+                const ageEl = document.getElementById('age_group');
+                if (ageEl) ageEl.value = mockCase.data.age_group;
+                const sevEl = document.getElementById('severity');
+                if (sevEl) sevEl.value = mockCase.data.severity;
+                const urgEl = document.getElementById('urgency');
+                if (urgEl) urgEl.value = mockCase.data.urgency;
+            }, 3200);
+        }
+
         // Load Vietnam Mock Button
         document.getElementById('loadVietnamMockBtn').addEventListener('click', () => {
             const privConsole = document.getElementById('privacyConsole');
@@ -2068,6 +2198,11 @@
                 const urgEl = document.getElementById('urgency');
                 if (urgEl) urgEl.value = VIETNAM_MOCK.urgency;
             }, 3200);
+        });
+
+        document.querySelectorAll('.mock-case-btn').forEach((btn) => {
+            if (btn.id === 'loadVietnamMockBtn') return;
+            btn.addEventListener('click', () => injectMockCase(EXTRA_MOCK_CASES[btn.dataset.mockCase]));
         });
 
         // Clarification submit handler
@@ -2177,8 +2312,15 @@
                 const packages = data.recommended_packages || [];
                 if (packages.length) {
                     renderPackageGrid(packages);
+                    _previousPackages = packages;
                 } else {
-                    byId('packageGrid').innerHTML = '<div class="info-card"><div class="info-value">No packages could be orchestrated for this case.</div></div>';
+                    alert("No more options available. Giving back previous options.");
+                    if (_previousPackages.length) {
+                        renderPackageGrid(_previousPackages);
+                        _rejectedHospitals = []; // Reset rejected hospitals so they aren't stuck
+                    } else {
+                        byId('packageGrid').innerHTML = '<div class="info-card"><div class="info-value">No packages could be orchestrated for this case.</div></div>';
+                    }
                 }
                 window.scrollTo({ top: byId('step2').offsetTop - 12, behavior: 'smooth' });
 

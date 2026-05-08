@@ -3,7 +3,7 @@ pipeline/ingest_mock_data.py
 ============================
 Injects mock hospital, doctor and charity entries into ChromaDB that are:
 - Relevant to Vietnamese patients (Diabetic Nephropathy, Coronary Artery Disease)
-- Sufficient to generate all three letter templates (Appointment, MHTC, Visa Support)
+- Diverse enough to showcase regeneration, alternate specialists, and support-letter flows
 """
 
 import os
@@ -225,6 +225,151 @@ MOCK_DOCTORS = [
             "Foreigner Pricing: Rapid respiratory and oncology workup. Est: USD $110 - $200."
         )
     },
+    {
+        "id": "mock_cardio_02",
+        "name": "Dr. Harjit Singh Bedi",
+        "specialty": "Cardiothoracic Surgery",
+        "specialty_tags": "Cardiothoracic Surgery, Coronary Artery Disease, CABG, Valve Surgery, High Risk Cardiac Cases",
+        "hospital": "Sunway Medical Centre",
+        "hospital_location": "Kuala Lumpur",
+        "tier": "Standard Private",
+        "qualification": "MS Surgery, Fellowship Cardiothoracic Surgery",
+        "graduated_from": "Universiti Malaya",
+        "provisional_registration_number": "",
+        "full_registration_number": "60214",
+        "mmc_profile_id": "mock_008",
+        "mmc_url": "https://merits.mmc.gov.my/viewDoctor/mock008/search",
+        "primary_practice": "Sunway Medical Centre, Bandar Sunway, Selangor",
+        "document_text": (
+            "Doctor Name: Dr. Harjit Singh Bedi\n"
+            "Sub-Specialty: Cardiothoracic Surgery\n"
+            "Specialty Tags: Coronary Artery Disease, CABG, Valve Surgery, Complex Cardiac Cases\n"
+            "Affiliated Hospital: Sunway Medical Centre\n"
+            "Qualification: MS Surgery, Fellowship Cardiothoracic Surgery\n"
+            "Graduated From: Universiti Malaya\n"
+            "Full Registration Number: 60214\n"
+            "Primary Practice: Sunway Medical Centre, Bandar Sunway, Selangor\n"
+            "MMC Profile URL: https://merits.mmc.gov.my/viewDoctor/mock008/search\n"
+            "Medical Tourist Tier: Standard Private\n"
+            "Foreigner Pricing: Advanced surgical heart care. Est: USD $140 - $260."
+        )
+    },
+    {
+        "id": "mock_nephro_02",
+        "name": "Dr. Wong Siew Mei",
+        "specialty": "Nephrology",
+        "specialty_tags": "Nephrology, Chronic Kidney Disease, Diabetic Nephropathy, Dialysis Access, Renal Failure",
+        "hospital": "Penang Adventist Hospital",
+        "hospital_location": "Penang",
+        "tier": "Standard Private",
+        "qualification": "MRCP, Fellowship Nephrology",
+        "graduated_from": "Universiti Sains Malaysia",
+        "provisional_registration_number": "",
+        "full_registration_number": "59014",
+        "mmc_profile_id": "mock_009",
+        "mmc_url": "https://merits.mmc.gov.my/viewDoctor/mock009/search",
+        "primary_practice": "Penang Adventist Hospital, Jalan Burma, Pulau Pinang",
+        "document_text": (
+            "Doctor Name: Dr. Wong Siew Mei\n"
+            "Sub-Specialty: Nephrology\n"
+            "Specialty Tags: Chronic Kidney Disease, Diabetic Nephropathy, Dialysis, Renal Failure, CKD\n"
+            "Affiliated Hospital: Penang Adventist Hospital\n"
+            "Qualification: MRCP, Fellowship Nephrology\n"
+            "Graduated From: Universiti Sains Malaysia\n"
+            "Full Registration Number: 59014\n"
+            "Primary Practice: Penang Adventist Hospital, Jalan Burma, Pulau Pinang\n"
+            "MMC Profile URL: https://merits.mmc.gov.my/viewDoctor/mock009/search\n"
+            "Medical Tourist Tier: Standard Private\n"
+            "Foreigner Pricing: Renal stabilization and continuity care. Est: USD $95 - $190."
+        )
+    },
+    {
+        "id": "mock_onco_02",
+        "name": "Dr. Farah Nadiah Zulkifli",
+        "specialty": "Medical Oncology",
+        "specialty_tags": "Medical Oncology, Small Cell Lung Cancer, Thoracic Oncology, Chemotherapy, Immunotherapy",
+        "hospital": "Gleneagles Hospital Kuala Lumpur",
+        "hospital_location": "Kuala Lumpur",
+        "tier": "Premium Private",
+        "qualification": "MRCP (UK), Fellowship Medical Oncology",
+        "graduated_from": "Universiti Kebangsaan Malaysia",
+        "provisional_registration_number": "",
+        "full_registration_number": "61330",
+        "mmc_profile_id": "mock_010",
+        "mmc_url": "https://merits.mmc.gov.my/viewDoctor/mock010/search",
+        "primary_practice": "Gleneagles Hospital Kuala Lumpur, Jalan Ampang, Kuala Lumpur",
+        "document_text": (
+            "Doctor Name: Dr. Farah Nadiah Zulkifli\n"
+            "Sub-Specialty: Medical Oncology\n"
+            "Specialty Tags: Small Cell Lung Cancer, Thoracic Oncology, Chemotherapy, Urgent Cancer Assessment\n"
+            "Affiliated Hospital: Gleneagles Hospital Kuala Lumpur\n"
+            "Qualification: MRCP (UK), Fellowship Medical Oncology\n"
+            "Graduated From: Universiti Kebangsaan Malaysia\n"
+            "Full Registration Number: 61330\n"
+            "Primary Practice: Gleneagles Hospital Kuala Lumpur, Jalan Ampang, Kuala Lumpur\n"
+            "MMC Profile URL: https://merits.mmc.gov.my/viewDoctor/mock010/search\n"
+            "Medical Tourist Tier: Premium Private\n"
+            "Foreigner Pricing: Premium rapid-access oncology care. Est: USD $170 - $320."
+        )
+    },
+    {
+        "id": "mock_radio_onco_02",
+        "name": "Dr. Lee Mei Xuan",
+        "specialty": "Radiation Oncology",
+        "specialty_tags": "Radiation Oncology, SCLC, Thoracic Radiotherapy, Lung Cancer, Limited Stage SCLC",
+        "hospital": "Pantai Hospital Kuala Lumpur",
+        "hospital_location": "Kuala Lumpur",
+        "tier": "Standard Private",
+        "qualification": "MBBS, Master Clinical Oncology",
+        "graduated_from": "Universiti Malaya",
+        "provisional_registration_number": "",
+        "full_registration_number": "60478",
+        "mmc_profile_id": "mock_011",
+        "mmc_url": "https://merits.mmc.gov.my/viewDoctor/mock011/search",
+        "primary_practice": "Pantai Hospital Kuala Lumpur, Bangsar, Kuala Lumpur",
+        "document_text": (
+            "Doctor Name: Dr. Lee Mei Xuan\n"
+            "Sub-Specialty: Radiation Oncology\n"
+            "Specialty Tags: Radiation Oncology, SCLC, Thoracic Radiotherapy, Concurrent Chemoradiation\n"
+            "Affiliated Hospital: Pantai Hospital Kuala Lumpur\n"
+            "Qualification: MBBS, Master Clinical Oncology\n"
+            "Graduated From: Universiti Malaya\n"
+            "Full Registration Number: 60478\n"
+            "Primary Practice: Pantai Hospital Kuala Lumpur, Bangsar, Kuala Lumpur\n"
+            "MMC Profile URL: https://merits.mmc.gov.my/viewDoctor/mock011/search\n"
+            "Medical Tourist Tier: Standard Private\n"
+            "Foreigner Pricing: Structured cancer radiotherapy program. Est: USD $130 - $240."
+        )
+    },
+    {
+        "id": "mock_pulmo_02",
+        "name": "Dr. Mohammad Iqbal Rahman",
+        "specialty": "Respiratory Medicine",
+        "specialty_tags": "Respiratory Medicine, Lung Cancer, Bronchoscopy, Pleural Disease, Pre-Oncology Workup",
+        "hospital": "KPJ Johor Specialist Hospital",
+        "hospital_location": "Johor Bahru",
+        "tier": "Standard Private",
+        "qualification": "MRCP, Fellowship Respiratory Medicine",
+        "graduated_from": "Universiti Kebangsaan Malaysia",
+        "provisional_registration_number": "",
+        "full_registration_number": "58802",
+        "mmc_profile_id": "mock_012",
+        "mmc_url": "https://merits.mmc.gov.my/viewDoctor/mock012/search",
+        "primary_practice": "KPJ Johor Specialist Hospital, Johor Bahru",
+        "document_text": (
+            "Doctor Name: Dr. Mohammad Iqbal Rahman\n"
+            "Sub-Specialty: Respiratory Medicine\n"
+            "Specialty Tags: Lung Cancer, Bronchoscopy, Pleural Disease, Chest Symptoms, Oncology Workup\n"
+            "Affiliated Hospital: KPJ Johor Specialist Hospital\n"
+            "Qualification: MRCP, Fellowship Respiratory Medicine\n"
+            "Graduated From: Universiti Kebangsaan Malaysia\n"
+            "Full Registration Number: 58802\n"
+            "Primary Practice: KPJ Johor Specialist Hospital, Johor Bahru\n"
+            "MMC Profile URL: https://merits.mmc.gov.my/viewDoctor/mock012/search\n"
+            "Medical Tourist Tier: Standard Private\n"
+            "Foreigner Pricing: Efficient respiratory workup and stabilization. Est: USD $100 - $180."
+        )
+    },
 ]
 
 # ---------------------------------------------------------------------------
@@ -301,6 +446,40 @@ MOCK_CHARITIES = [
             "Notes: Provides financial support for ASEAN patients requiring urgent oncology treatment in Malaysia."
         )
     },
+    {
+        "id": "mock_charity_id_cardio_01",
+        "name": "Indonesia Cross-Border Cardiac Relief Fund",
+        "organization": "ICCRF",
+        "supported_countries": "Indonesia, Malaysia",
+        "conditions_supported": "Coronary Artery Disease, Heart Failure, Cardiac Surgery, Chronic Kidney Disease",
+        "max_grant_usd": 2800,
+        "contact": "iccrf@foundation.org.my",
+        "description": (
+            "Name: Indonesia Cross-Border Cardiac Relief Fund\n"
+            "Organization: ICCRF\n"
+            "Supported Countries: Indonesia, Malaysia\n"
+            "Conditions: Coronary Artery Disease, Heart Failure, Cardiac Surgery, Chronic Kidney Disease\n"
+            "Max Grant: USD $2,800\n"
+            "Notes: Supports Indonesian patients referred for urgent heart and renal specialist treatment in Malaysia."
+        )
+    },
+    {
+        "id": "mock_charity_kh_onco_01",
+        "name": "Mekong Women Cancer Access Fund",
+        "organization": "MWCAF",
+        "supported_countries": "Cambodia, Laos, Vietnam, Myanmar",
+        "conditions_supported": "Cancer, Oncology, Cervical Cancer, Lung Cancer, Chemotherapy, Radiotherapy",
+        "max_grant_usd": 4200,
+        "contact": "mwcaf@charity.my",
+        "description": (
+            "Name: Mekong Women Cancer Access Fund\n"
+            "Organization: MWCAF\n"
+            "Supported Countries: Cambodia, Laos, Vietnam, Myanmar\n"
+            "Conditions: Cancer, Oncology, Cervical Cancer, Lung Cancer, Chemotherapy, Radiotherapy\n"
+            "Max Grant: USD $4,200\n"
+            "Notes: Helps lower-income Mekong-region patients access oncology treatment and travel support in Malaysia."
+        )
+    },
 ]
 
 
@@ -370,6 +549,6 @@ if __name__ == "__main__":
 
     ingest_doctors(client)
     ingest_charities(client)
-    print("\n[MOCK INGEST] Done. RAG is now primed with Vietnamese patient-relevant records.")
-    print("These mock entries support: Coronary Artery Disease, Diabetic Nephropathy, CKD, Type 2 Diabetes.")
-    print("Letter templates supported: Appointment Letter, MHTC Letter, Visa Support Letter.")
+    print("\n[MOCK INGEST] Done. RAG is now primed with broader ASEAN demo records.")
+    print("These mock entries support: Coronary Artery Disease, Diabetic Nephropathy, CKD, Type 2 Diabetes, Lung Cancer, and SCLC.")
+    print("Letter templates supported: Travel Guidance Letter, MHTC Letter, and Visa Support Letter.")

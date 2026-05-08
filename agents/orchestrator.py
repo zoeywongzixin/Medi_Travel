@@ -4,8 +4,10 @@ import requests
 import json
 
 from agents.charity_agent import calculate_potential_subsidy, match_charities
+from agents.flight_agent import get_flight_options
 from agents.logistics_agent import (
     get_transport_requirements,
+    infer_hospital_city,
     resolve_user_origin_city,
     simulate_route_lookup,
 )
@@ -91,6 +93,44 @@ def _build_package_label(index: int, preference: str, manual_override: bool) -> 
         }
         return labels.get(preference, "Best Overall")
     return f"Alternative {index}"
+
+
+DESTINATION_AIRPORTS = {
+    "Kuala Lumpur": "KUL",
+    "Penang": "PEN",
+    "Johor Bahru": "JHB",
+    "Malacca": "MKZ",
+    "Kota Kinabalu": "BKI",
+    "Kuching": "KCH",
+    "Putrajaya": "KUL",
+}
+
+
+def _destination_airport_for_hospital(hospital: Dict) -> str:
+    city = infer_hospital_city(hospital.get("hospital_location", hospital.get("hospital", "")))
+    return DESTINATION_AIRPORTS.get(city, "KUL")
+
+
+def _normalize_selected_flight(flight_bundle: Dict, fallback_route: Dict) -> Dict:
+    options = (flight_bundle or {}).get("options") or []
+    selected = options[0] if options else {}
+    travel_cost_usd = float(selected.get("travel_cost_usd") or fallback_route.get("travel_cost_usd") or 0.0)
+    travel_duration_hours = float(selected.get("travel_duration_hours") or fallback_route.get("travel_duration_hours") or 0.0)
+
+    return {
+        "airline": selected.get("airline") or selected.get("provider") or "Flight option pending",
+        "route": fallback_route.get("route", selected.get("route", "Route to Malaysia")),
+        "departure": selected.get("departure", ""),
+        "arrival": selected.get("arrival", ""),
+        "price": selected.get("price") or f"{travel_cost_usd:.0f} USD",
+        "type": selected.get("type") or fallback_route.get("travel_mode", "Commercial Flight"),
+        "travel_mode": selected.get("travel_mode") or fallback_route.get("travel_mode", "Commercial Flight"),
+        "travel_cost_usd": travel_cost_usd,
+        "travel_duration_hours": travel_duration_hours,
+        "origin_city": fallback_route.get("origin_city", ""),
+        "destination_city": fallback_route.get("destination_city", ""),
+        "lookup_type": selected.get("source") or fallback_route.get("lookup_type", "simulated_asean_route"),
+    }
 
 
 from utils.llm import call_gemini
@@ -273,20 +313,31 @@ def orchestrate_packages(
     packages: List[Dict] = []
     for hospital in hospitals:
         route = route_cache[hospital.get("id", hospital.get("hospital"))]
+        flight_bundle = get_flight_options(
+            {
+                **transport_requirements,
+                "departure_date": travel_dates["arrival_date"],
+                "adults": 2 if transport_requirements.get("medical_escort_needed") else 1,
+                "max_offers": 3,
+            },
+            origin_country=origin_country,
+            destination_airport=_destination_airport_for_hospital(hospital),
+        )
+        selected_flight = _normalize_selected_flight(flight_bundle, route)
         adjusted_base_cost = round(clinical_summary["estimated_cost_usd"] * _hospital_cost_multiplier(hospital.get("tier")), 2)
         subsidy = calculate_potential_subsidy(
             hospital=hospital,
             matched_charities=charities,
             budget_usd=budget_usd,
             base_medical_cost_usd=adjusted_base_cost,
-            travel_cost_usd=route["travel_cost_usd"],
+            travel_cost_usd=selected_flight["travel_cost_usd"],
         )
 
         total_care_package = _dump_model(
             _build_total_care_package(
                 base_medical_cost=adjusted_base_cost,
                 grant_reduction=subsidy["grant_reduction_usd"],
-                travel_cost=route["travel_cost_usd"],
+                travel_cost=selected_flight["travel_cost_usd"],
                 budget_usd=budget_usd,
             )
         )
@@ -303,18 +354,19 @@ def orchestrate_packages(
         package_logistics = {
             **transport_requirements,
             "route_estimate": route,
+            "flight_search": flight_bundle,
         }
 
         accessibility_score = _compute_accessibility_score(
             hospital=hospital,
             total_care_package=total_care_package,
-            route=route,
+            route=selected_flight,
             subsidy=subsidy,
             budget_usd=budget_usd,
         )
         structured_itinerary = _build_structured_itinerary(
             hospital=hospital,
-            route=route,
+            route=selected_flight,
             total_care_package=total_care_package,
             subsidy=subsidy,
             accessibility_score=accessibility_score,
@@ -344,7 +396,7 @@ def orchestrate_packages(
                 "package_type": "",
                 "package_reasoning": package_reasoning,
                 "specialist": hospital,
-                "flight": route,
+                "flight": selected_flight,
                 "flight_logistics": package_logistics,
                 "travel_dates": travel_dates,
                 "clinical_summary": package_clinical_summary,

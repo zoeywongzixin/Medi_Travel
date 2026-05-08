@@ -1,4 +1,5 @@
 import os
+import re
 from typing import Dict, List
 import serpapi
 from dotenv import load_dotenv
@@ -43,6 +44,31 @@ def search_google(query: str):
     
     organic = results.get("organic_results", [])
     return [{"title": r.get("title"), "link": r.get("link"), "snippet": r.get("snippet")} for r in organic]
+
+
+def _parse_price_to_usd(price_value) -> float:
+    if isinstance(price_value, (int, float)):
+        return float(price_value)
+    text = str(price_value or "")
+    match = re.search(r"(\d+(?:[.,]\d+)?)", text.replace(",", ""))
+    return float(match.group(1)) if match else 0.0
+
+
+def _parse_duration_hours(duration_value) -> float:
+    if isinstance(duration_value, (int, float)):
+        return round(float(duration_value) / 60.0, 1) if float(duration_value) > 24 else round(float(duration_value), 1)
+    text = str(duration_value or "").lower()
+    hours = 0.0
+    hour_match = re.search(r"(\d+(?:\.\d+)?)\s*h", text)
+    minute_match = re.search(r"(\d+(?:\.\d+)?)\s*m", text)
+    if hour_match:
+        hours += float(hour_match.group(1))
+    if minute_match:
+        hours += float(minute_match.group(1)) / 60.0
+    if hours:
+        return round(hours, 1)
+    numeric = re.search(r"(\d+(?:\.\d+)?)", text)
+    return round(float(numeric.group(1)), 1) if numeric else 0.0
 
 def find_flights(origin_country: str, destination_airport: str = "KUL", date: str = None, adults: int = 1, max_offers: int = 3) -> List[Dict]:
     """
@@ -106,15 +132,25 @@ def find_flights(origin_country: str, destination_airport: str = "KUL", date: st
                     departing_at = flights_info[0].get("departure_airport", {}).get("time", "Unknown")
                     # Use last segment for arrival if there are connections
                     arriving_at = flights_info[-1].get("arrival_airport", {}).get("time", "Unknown")
+
+                duration_value = offer.get("total_duration") or offer.get("duration") or offer.get("carbon_emissions", {}).get("duration")
+                travel_cost_usd = _parse_price_to_usd(price)
+                travel_duration_hours = _parse_duration_hours(duration_value)
+                route = f"{origin_airport} to {destination_airport}"
                 
-                price_str = f"{price} USD" if isinstance(price, (int, float)) else str(price)
+                price_str = f"{travel_cost_usd:.0f} USD" if travel_cost_usd else (f"{price} USD" if isinstance(price, (int, float)) else str(price))
                 
                 flights.append({
                     "airline": airline,
                     "price": price_str,
                     "departure": departing_at,
                     "arrival": arriving_at,
-                    "type": "Commercial Flight (Google Flights)"
+                    "type": "Commercial Flight (Google Flights)",
+                    "travel_mode": "Commercial Flight",
+                    "travel_cost_usd": travel_cost_usd,
+                    "travel_duration_hours": travel_duration_hours,
+                    "route": route,
+                    "source": "serpapi_google_flights",
                 })
             
             if flights:
@@ -130,16 +166,26 @@ def find_flights(origin_country: str, destination_airport: str = "KUL", date: st
         {
             "airline": "AirAsia (Mock)",
             "price": "120 USD",
-            "type": "Commercial Flight"
+            "type": "Commercial Flight",
+            "travel_mode": "Commercial Flight",
+            "travel_cost_usd": 120.0,
+            "travel_duration_hours": 2.3,
+            "route": f"{origin_airport} to {destination_airport}",
+            "source": "mock_fallback",
         },
         {
             "airline": "Malaysia Airlines (Mock)",
             "price": "250 USD",
-            "type": "Commercial Flight"
+            "type": "Commercial Flight",
+            "travel_mode": "Commercial Flight",
+            "travel_cost_usd": 250.0,
+            "travel_duration_hours": 2.0,
+            "route": f"{origin_airport} to {destination_airport}",
+            "source": "mock_fallback",
         }
     ]
 
-def get_flight_options(logistics_data: Dict, origin_country: str) -> Dict:
+def get_flight_options(logistics_data: Dict, origin_country: str, destination_airport: str = "KUL") -> Dict:
     """
     Analyzes logistics requirements and fetches appropriate flights.
     """
@@ -193,6 +239,7 @@ def get_flight_options(logistics_data: Dict, origin_country: str) -> Dict:
         
     flights = find_flights(
         origin_country=origin_country,
+        destination_airport=destination_airport,
         date=date,
         adults=adults,
         max_offers=max_offers

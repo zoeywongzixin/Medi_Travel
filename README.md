@@ -28,6 +28,7 @@ ai_medical_matching/
 |   `-- rerank_agent.py
 |-- data/                           Runtime stores and local sample data
 |   |-- chroma_db/
+|   |-- mock_cases/                 Multilingual sample chart text for demos
 |   |-- mock_db.sqlite
 |   `-- mock_vietnam_nguyen_van_a.txt
 |-- frontend/
@@ -99,6 +100,8 @@ flowchart TD
 - Clarification answers are normalized back into structured medical fields before rerunning package matching.
 - The previous appointment-letter flow is now a travel-guidance letter that explains how to contact the hospital, use the Malaysian visa portal, and complete MDAC.
 - Letter translation is done through the model-backed document translation path rather than hard-coded per-language templates.
+- **Memory & Regeneration**: The system maintains state for rejected hospitals. If the user regenerates and no more options are available, the system alerts the user and falls back to the previous options.
+- **Navigation**: Added "Back" buttons in the UI to allow seamless transition between the medical report summary and the matched packages.
 
 ## Request Flow
 
@@ -165,6 +168,8 @@ Recommended for local testing:
 ```bash
 python pipeline/ingest_mock_data.py
 ```
+
+This seeds extra specialists and charities so the tester's `Regenerate` flow has alternate matches to rotate through.
 
 Optional refresh jobs:
 

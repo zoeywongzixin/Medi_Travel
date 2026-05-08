@@ -801,7 +801,7 @@
                 </div>
 
                 <div class="button-row">
-                    <button type="button" class="secondary-btn" id="dlApptBtn">Appointment Letter</button>
+                    <button type="button" class="secondary-btn" id="dlApptBtn">Travel Guidance Letter</button>
                     <button type="button" class="secondary-btn" id="dlMhtcBtn">MHTC Letter</button>
                     <button type="button" class="primary-btn" id="dlVisaBtn">Visa Support Letter</button>
                 </div>
@@ -897,7 +897,7 @@
                 selectedHospitalLabel: 'Hospital',
                 selectedFlightLabel: 'Flight',
                 selectedCharityLabel: 'Charity',
-                dlApptBtn: 'Appointment Letter',
+                dlApptBtn: 'Travel Guidance Letter',
                 dlMhtcBtn: 'MHTC Letter',
                 dlVisaBtn: 'Visa Support Letter',
                 finalRawDataTitle: 'Technical details',
@@ -962,7 +962,7 @@
                 selectedHospitalLabel: 'Hospital',
                 selectedFlightLabel: 'Penerbangan',
                 selectedCharityLabel: 'Badan kebajikan',
-                dlApptBtn: 'Surat temu janji',
+                dlApptBtn: 'Travel Guidance Letter',
                 dlMhtcBtn: 'Surat MHTC',
                 dlVisaBtn: 'Surat sokongan visa',
                 finalRawDataTitle: 'Butiran teknikal',
@@ -1027,7 +1027,7 @@
                 selectedHospitalLabel: 'Rumah sakit',
                 selectedFlightLabel: 'Penerbangan',
                 selectedCharityLabel: 'Bantuan dana',
-                dlApptBtn: 'Surat janji temu',
+                dlApptBtn: 'Travel Guidance Letter',
                 dlMhtcBtn: 'Surat MHTC',
                 dlVisaBtn: 'Surat dukungan visa',
                 finalRawDataTitle: 'Detail teknis',
@@ -1092,7 +1092,7 @@
                 selectedHospitalLabel: 'Benh vien',
                 selectedFlightLabel: 'Chuyen bay',
                 selectedCharityLabel: 'Quy ho tro',
-                dlApptBtn: 'Thu hen',
+                dlApptBtn: 'Travel Guidance Letter',
                 dlMhtcBtn: 'Thu MHTC',
                 dlVisaBtn: 'Thu ho tro visa',
                 finalRawDataTitle: 'Chi tiet ky thuat',
@@ -1157,7 +1157,7 @@
                 selectedHospitalLabel: 'โรงพยาบาล',
                 selectedFlightLabel: 'เที่ยวบิน',
                 selectedCharityLabel: 'องค์กรช่วยเหลือ',
-                dlApptBtn: 'จดหมายใบนัด',
+                dlApptBtn: 'Travel Guidance Letter',
                 dlMhtcBtn: 'จดหมาย MHTC',
                 dlVisaBtn: 'จดหมายสนับสนุนวีซ่า',
                 finalRawDataTitle: 'รายละเอียดทางเทคนิค',
@@ -1222,7 +1222,7 @@
                 selectedHospitalLabel: 'Ospital',
                 selectedFlightLabel: 'Flight',
                 selectedCharityLabel: 'Charity',
-                dlApptBtn: 'Liham ng appointment',
+                dlApptBtn: 'Travel Guidance Letter',
                 dlMhtcBtn: 'Liham ng MHTC',
                 dlVisaBtn: 'Liham ng visa support',
                 finalRawDataTitle: 'Teknikal na detalye',
@@ -1287,7 +1287,7 @@
                 selectedHospitalLabel: 'ໂຮງໝໍ',
                 selectedFlightLabel: 'ຖ້ຽວບິນ',
                 selectedCharityLabel: 'ອົງກອນຊ່ວຍເຫຼືອ',
-                dlApptBtn: 'ໜັງສືນັດໝາຍ',
+                dlApptBtn: 'Travel Guidance Letter',
                 dlMhtcBtn: 'ໜັງສື MHTC',
                 dlVisaBtn: 'ໜັງສືສະໜັບສະໜູນວີຊາ',
                 finalRawDataTitle: 'ລາຍລະອຽດທາງເຕັກນິກ',
@@ -1352,7 +1352,7 @@
                 selectedHospitalLabel: 'មន្ទីរពេទ្យ',
                 selectedFlightLabel: 'ជើងហោះហើរ',
                 selectedCharityLabel: 'មូលនិធិ',
-                dlApptBtn: 'លិខិតណាត់ជួប',
+                dlApptBtn: 'Travel Guidance Letter',
                 dlMhtcBtn: 'លិខិត MHTC',
                 dlVisaBtn: 'លិខិតគាំទ្រវីសា',
                 finalRawDataTitle: 'ព័ត៌មានបច្ចេកទេស',
@@ -1417,7 +1417,7 @@
                 selectedHospitalLabel: 'ဆေးရုံ',
                 selectedFlightLabel: 'လေယာဉ်ခရီးစဉ်',
                 selectedCharityLabel: 'ကူညီရေးအဖွဲ့',
-                dlApptBtn: 'ချိန်းဆိုစာ',
+                dlApptBtn: 'Travel Guidance Letter',
                 dlMhtcBtn: 'MHTC စာ',
                 dlVisaBtn: 'ဗီဇာထောက်ခံစာ',
                 finalRawDataTitle: 'နည်းပညာဆိုင်ရာအသေးစိတ်',
@@ -1941,7 +1941,7 @@
         byId('translateLetterBtn').addEventListener('click', translatePreview);
         byId('confirmDownloadBtn').addEventListener('click', downloadPDF);
 
-        byId('dlApptBtn').addEventListener('click', () => previewLetter('appointment_conf'));
+        byId('dlApptBtn').addEventListener('click', () => previewLetter('care_guidance'));
         byId('dlMhtcBtn').addEventListener('click', () => previewLetter('mhtc_visa_support'));
         byId('dlVisaBtn').addEventListener('click', () => previewLetter('visa_support'));
         byId('restartBtn').addEventListener('click', () => window.location.reload());
@@ -2080,7 +2080,17 @@
             
             // Inject the answer into medical data as a note
             if (_pendingMedicalData) {
+                _pendingMedicalData._latest_clarification_answer = answer;
                 _pendingMedicalData.raw_summary = (_pendingMedicalData.raw_summary || '') + ' ' + answer;
+
+                const answerLc = answer.toLowerCase();
+                if (answerLc.includes('limited')) {
+                    _pendingMedicalData.stage = 'Limited Stage';
+                    _pendingMedicalData.cancer_stage = 'Limited Stage';
+                } else if (answerLc.includes('extensive')) {
+                    _pendingMedicalData.stage = 'Extensive Stage';
+                    _pendingMedicalData.cancer_stage = 'Extensive Stage';
+                }
             }
             
             await runMatchPackages(_pendingMedicalData);

@@ -23,6 +23,7 @@ from utils.translator import (
 from utils.parser import get_concise_json
 from utils.privacy import PrivacyScrubber
 from utils.letter_generator import (
+    GUIDANCE_TEMPLATE_KEYS,
     LETTER_SKELETONS,
     VISA_TEMPLATE_KEYS,
     build_visa_support_content,
@@ -37,7 +38,7 @@ from agents.orchestrator import orchestrate_packages, generate_single_package
 from agents.medical_agent import match_hospitals
 from agents.flight_agent import get_flight_options
 from agents.charity_agent import match_charities
-from utils.llm import check_for_clinical_gaps
+from utils.llm import check_for_clinical_gaps, normalize_medical_data_for_clarification
 from utils.db import log_match, get_few_shot_feedback
 from typing import Optional, List
 import uuid
@@ -149,7 +150,7 @@ async def match_packages(request: MatchRequest):
     Step 2: Takes the extracted medical data and orchestrates layers 1, 2, and 3.
     Supports memory (rejected_hospitals) and Few-Shot feedback injection.
     """
-    medical_data = request.medical_data
+    medical_data = normalize_medical_data_for_clarification(request.medical_data)
     origin = request.origin_country
     preferred_month = request.preferred_month
     language = request.preferred_language
@@ -299,7 +300,7 @@ async def api_preview_letter(request: GenerateLetterRequest):
     
     template = LETTER_SKELETONS[request.template_key]
     try:
-        if request.template_key in VISA_TEMPLATE_KEYS:
+        if request.template_key in VISA_TEMPLATE_KEYS or request.template_key in GUIDANCE_TEMPLATE_KEYS:
             content = build_visa_support_content(
                 template_str=request.template_key,
                 user_data=request.user_data,
@@ -327,7 +328,7 @@ async def api_generate_letter(request: GenerateLetterRequest):
     
     template = LETTER_SKELETONS[request.template_key]
     try:
-        if request.template_key in VISA_TEMPLATE_KEYS:
+        if request.template_key in VISA_TEMPLATE_KEYS or request.template_key in GUIDANCE_TEMPLATE_KEYS:
             content = build_visa_support_content(
                 template_str=request.template_key,
                 user_data=request.user_data,

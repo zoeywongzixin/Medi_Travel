@@ -1,6 +1,7 @@
 import os
 import requests
 import json
+import re
 from typing import Dict, Any, Optional, List
 
 
@@ -145,6 +146,25 @@ def check_for_clinical_gaps(medical_data: Dict[str, Any]) -> Optional[Dict[str, 
     Checks if the medical data is missing critical details. 
     Returns the clarification tool arguments if a gap is found.
     """
+    condition_text = " ".join(
+        [
+            str((medical_data or {}).get("condition", "")),
+            str((medical_data or {}).get("raw_summary", "")),
+        ]
+    ).lower()
+    if any(token in condition_text for token in ("small cell lung cancer", "sclc")):
+        normalized_stage = _extract_sclc_stage(
+            " ".join(
+                [
+                    str((medical_data or {}).get("stage", "")),
+                    str((medical_data or {}).get("cancer_stage", "")),
+                    str((medical_data or {}).get("_latest_clarification_answer", "")),
+                ]
+            )
+        )
+        if normalized_stage:
+            return None
+
     system_prompt = (
         "You are a clinical reviewer. Review the extracted medical data. "
         "If you find that a CRITICAL detail is missing that is absolutely necessary to recommend a hospital or package (like severity for cancer, or age for pediatric conditions), "
@@ -159,3 +179,56 @@ def check_for_clinical_gaps(medical_data: Dict[str, Any]) -> Optional[Dict[str, 
             return tool_call["args"]
             
     return None
+
+
+def _extract_sclc_stage(text: str) -> Optional[str]:
+    normalized = (text or "").strip().lower()
+    if not normalized:
+        return None
+    if "limited" in normalized:
+        return "Limited Stage"
+    if "extensive" in normalized:
+        return "Extensive Stage"
+    return None
+
+
+def normalize_medical_data_for_clarification(medical_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Normalize direct clarification answers into structured fields so the reviewer
+    can stop asking for the same missing detail on every retry.
+    """
+    normalized = dict(medical_data or {})
+    combined_text = " ".join(
+        [
+            str(normalized.get("condition", "")),
+            str(normalized.get("raw_summary", "")),
+            str(normalized.get("stage", "")),
+            str(normalized.get("cancer_stage", "")),
+            str(normalized.get("_latest_clarification_answer", "")),
+        ]
+    )
+
+    if any(token in combined_text.lower() for token in ("small cell lung cancer", "sclc")):
+        explicit_stage = (
+            _extract_sclc_stage(str(normalized.get("_latest_clarification_answer", "")))
+            or _extract_sclc_stage(str(normalized.get("cancer_stage", "")))
+            or _extract_sclc_stage(str(normalized.get("stage", "")))
+        )
+        inferred_stage = _extract_sclc_stage(combined_text)
+
+        if explicit_stage:
+            normalized["cancer_stage"] = explicit_stage
+            normalized["stage"] = explicit_stage
+            normalized["condition"] = re.sub(
+                r"\s*\((limited|extensive)\s+stage\)\s*$",
+                "",
+                str(normalized.get("condition", "")),
+                flags=re.IGNORECASE,
+            ).strip()
+            if normalized["condition"]:
+                normalized["condition"] = f"{normalized['condition']} ({explicit_stage})"
+        elif inferred_stage:
+            normalized["cancer_stage"] = inferred_stage
+            normalized["stage"] = inferred_stage
+
+    return normalized

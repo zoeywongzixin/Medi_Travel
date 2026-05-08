@@ -4,7 +4,26 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 LETTER_SKELETONS = {
-    "appointment_conf": "Surat Pengesahan Rawatan\n\nDengan ini disahkan bahawa pesakit sedang menerima rawatan di {hospital_name} di bawah seliaan {specialist_name}.",
+    "appointment_conf": (
+        "MEDICAL TRAVEL PREPARATION GUIDE\n\n"
+        "This guidance note is prepared for {patient_name} in relation to possible medical travel to Malaysia "
+        "for {medical_condition}. It is intended to help the patient and caregiver organize next steps with the "
+        "selected hospital, immigration process, and travel documentation.\n\n"
+        "Recommended Hospital Pathway:\n"
+        "{hospital_details}\n\n"
+        "Visa Portal Reference:\n"
+        "https://malaysiavisa.imi.gov.my/\n"
+    ),
+    "care_guidance": (
+        "MEDICAL TRAVEL PREPARATION GUIDE\n\n"
+        "This guidance note is prepared for {patient_name} in relation to possible medical travel to Malaysia "
+        "for {medical_condition}. It is intended to help the patient and caregiver organize next steps with the "
+        "selected hospital, immigration process, and travel documentation.\n\n"
+        "Recommended Hospital Pathway:\n"
+        "{hospital_details}\n\n"
+        "Visa Portal Reference:\n"
+        "https://malaysiavisa.imi.gov.my/\n"
+    ),
     "visa_support": (
         "OFFICIAL MEDICAL INVITATION\n"
         "Reference: {appointment_id}\n"
@@ -81,6 +100,7 @@ LETTER_SKELETONS = {
 }
 
 VISA_TEMPLATE_KEYS = {"visa_support", "mhtc_visa_support"}
+GUIDANCE_TEMPLATE_KEYS = {"appointment_conf", "care_guidance"}
 UNICODE_FONT_CANDIDATES = (
     Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
     Path("C:/Windows/Fonts/arial.ttf"),
@@ -310,6 +330,62 @@ def build_visa_support_content(
 
     if template_str in VISA_TEMPLATE_KEYS:
         return content
+
+    if template_str in GUIDANCE_TEMPLATE_KEYS:
+        guidance_title = "MEDICAL TRAVEL PREPARATION GUIDE"
+        hospital_name = user_data.get("hospital_name", "Selected Hospital")
+        diagnosis = user_data.get("medical_condition", "Clinical condition under review")
+        specialist_name = user_data.get("specialist_name", "Selected Specialist")
+
+        guidance_content = "\n".join([
+            guidance_title,
+            f"Date: {current_date}",
+            "",
+            "This document is a patient guidance note for medical travel planning to Malaysia.",
+            f"Provisional diagnosis: {diagnosis}",
+            "",
+            "Recommended hospital from the current match",
+            hospital_line,
+            "",
+            "Suggested next steps",
+            "1. Select a hospital",
+            (
+                f"Visit the MHTC hospital list and confirm which accredited facility you want to approach. "
+                f"The current matched option is {hospital_name}."
+            ),
+            "",
+            "2. Contact the hospital or specialist team",
+            (
+                f"Reach out to the hospital's international patient center or specialist coordination desk for "
+                f"{specialist_name}. Share the medical report, passport copy, and caregiver details if relevant. "
+                "Ask for case review, estimated treatment plan, estimated cost, expected stay duration, and any "
+                "supporting letter needed for immigration processing."
+            ),
+            "",
+            "3. Apply for the visa",
+            (
+                "Go to the MYVISA portal, choose the Medical Tourist category, and upload the required documents. "
+                "Portal reference: https://malaysiavisa.imi.gov.my/"
+            ),
+            "",
+            "4. Prepare travel documents",
+            (
+                "Keep the passport, medical report, hospital correspondence, caregiver passport details, and proof "
+                "of funds or sponsorship ready for review during the visa and travel process."
+            ),
+            "",
+            "5. Complete the Malaysia Digital Arrival Card",
+            "Complete the MDAC within 3 days before your flight to Malaysia.",
+            "",
+            "6. Arrival planning",
+            (
+                "After travel approval is issued, confirm the arrival date, airport transfer, and first hospital "
+                "contact point before departure."
+            ),
+            "",
+            "This guidance note is for planning support only and does not replace direct instructions from the hospital, immigration authorities, or licensed medical professionals.",
+        ])
+        return guidance_content
 
     final_template = LETTER_SKELETONS.get(template_str, template_str)
     return fill_template(final_template, user_data)

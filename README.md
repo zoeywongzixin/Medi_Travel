@@ -1,22 +1,24 @@
 # ASEAN Medical Match
 
-ASEAN Medical Match is a FastAPI-based medical travel matching system for patients seeking treatment in Malaysia. It combines OCR, privacy scrubbing, clinical structuring, hospital retrieval, logistics planning, charity matching, and support-letter generation in one pipeline.
+ASEAN Medical Match is a FastAPI-based medical travel matching system for patients seeking treatment in Malaysia. It combines OCR, privacy scrubbing, translation, clinical structuring, hospital retrieval, logistics planning, charity matching, and printable travel-support documents in one pipeline.
 
 ## What It Does
 
-- extracts text from chart images or PDFs
-- scrubs sensitive patient information before LLM use
-- structures messy chart text into medical case data
-- matches hospitals and specialists from a local ChromaDB store
-- estimates transport, travel dates, and financial support
-- generates itinerary summaries and printable support letters
+- Extracts text from chart images or PDFs.
+- Scrubs sensitive patient information before LLM use.
+- Translates OCR output into clean English for downstream reasoning.
+- Structures messy chart text into medical case data.
+- Detects critical clinical gaps and asks follow-up questions when needed.
+- Matches hospitals and specialists from a local ChromaDB store.
+- Estimates transport, travel dates, and financial support.
+- Generates itinerary summaries, visa-support letters, and travel-guidance letters.
 
-## Current Structure
+## Project Layout
 
 ```text
 ai_medical_matching/
-|-- app.py
-|-- agents/
+|-- app.py                          FastAPI entrypoint and API routes
+|-- agents/                         Retrieval, routing, orchestration, reranking
 |   |-- charity_agent.py
 |   |-- document_agent.py
 |   |-- flight_agent.py
@@ -24,27 +26,27 @@ ai_medical_matching/
 |   |-- medical_agent.py
 |   |-- orchestrator.py
 |   `-- rerank_agent.py
-|-- data/
+|-- data/                           Runtime stores and local sample data
 |   |-- chroma_db/
 |   |-- mock_db.sqlite
 |   `-- mock_vietnam_nguyen_van_a.txt
 |-- frontend/
-|   `-- pipeline_tester.html
-|-- model_cache/
-|-- pipeline/
+|   `-- pipeline_tester.html        Single-page tester UI
+|-- model_cache/                    Local embedding / ONNX cache
+|-- pipeline/                       Ingestion and reporting scripts
 |   |-- generate_charity_dashboard.py
 |   |-- generate_report.py
 |   |-- ingest_charities.py
 |   |-- ingest_doctors.py
 |   `-- ingest_mock_data.py
-|-- reports/
+|-- reports/                        Generated HTML dashboards
 |   |-- charity_dashboard.html
 |   `-- db_dashboard.html
 |-- tests/
-|   |-- dev_tools/
-|   |-- fixtures/
+|   |-- dev_tools/                  Manual debugging scripts
+|   |-- fixtures/                   OCR sample inputs
 |   `-- test_pipeline.py
-|-- utils/
+|-- utils/                          Shared OCR, LLM, schema, PDF, and helper modules
 |   |-- currency.py
 |   |-- date_calculator.py
 |   |-- db.py
@@ -56,12 +58,14 @@ ai_medical_matching/
 |   |-- parser.py
 |   |-- privacy.py
 |   |-- schemas.py
-|   |-- translator.py
-|   `-- poppler-25.12.0/
+|   `-- translator.py
 |-- docker-compose.yml
 |-- Dockerfile
-`-- requirements.txt
+|-- requirements.txt
+`-- start.sh
 ```
+
+Generated folders such as `__pycache__/`, `.pytest_cache/`, temporary OCR files, and local binary bundles are intentionally not part of the source layout.
 
 ## Architecture
 
@@ -89,12 +93,19 @@ flowchart TD
     Q["SQLite Match Log<br/>data/mock_db.sqlite"] --> G
 ```
 
+## Current Behavior Notes
+
+- OCR text is translated through the model layer before parsing.
+- Clarification answers are normalized back into structured medical fields before rerunning package matching.
+- The previous appointment-letter flow is now a travel-guidance letter that explains how to contact the hospital, use the Malaysian visa portal, and complete MDAC.
+- Letter translation is done through the model-backed document translation path rather than hard-coded per-language templates.
+
 ## Request Flow
 
 1. `POST /api/v1/extract`
    OCRs the uploaded chart, scrubs PII, translates the text, and returns structured medical data.
 2. `POST /api/v1/match-packages`
-   Builds ranked packages from hospital retrieval, route simulation, grant estimates, and budget rules.
+   Runs clarification checks, builds ranked packages from hospital retrieval, route simulation, grant estimates, and budget rules.
 3. `POST /api/v1/preview-letter` or `POST /api/v1/generate-letter`
    Produces support-letter previews or PDFs from the selected package.
 
@@ -105,7 +116,7 @@ flowchart TD
 | `GET` | `/` | Health check |
 | `GET` | `/tester` | Interactive browser tester |
 | `POST` | `/api/v1/extract` | OCR -> scrub -> translate -> parse |
-| `POST` | `/api/v1/match-packages` | Full orchestration |
+| `POST` | `/api/v1/match-packages` | Full orchestration with clarification loop |
 | `POST` | `/api/v1/match-hospitals` | Hospital retrieval only |
 | `POST` | `/api/v1/match-flights` | Route and logistics only |
 | `POST` | `/api/v1/match-charities` | Charity retrieval only |
@@ -122,8 +133,8 @@ flowchart TD
 
 - Python 3.10+
 - Tesseract OCR
-- Poppler for PDF conversion
-- optional Gemini API key
+- Poppler for PDF conversion on Windows
+- Optional Gemini API key
 
 ### Install
 
@@ -189,8 +200,8 @@ python tests/dev_tools/test_vietnamese_parsing.py
 python tests/dev_tools/test_api.py
 ```
 
-## Cleanup Notes
+## Repo Hygiene
 
-- cache folders like `__pycache__/` and `.pytest_cache/` are not part of the project structure
-- duplicate tester and nested fixture copies were removed
-- runtime stores under `data/` are intentionally kept because the app depends on them
+- `model_cache/`, `data/chroma_db/`, and generated `reports/` are runtime artifacts, not hand-edited source files.
+- `__pycache__/`, `.pytest_cache/`, and temporary OCR files can be safely deleted.
+- External Windows binary folders such as local Poppler bundles should stay out of git and be referenced through `.env`.

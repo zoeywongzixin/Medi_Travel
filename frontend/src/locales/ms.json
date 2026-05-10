@@ -1,0 +1,15 @@
+{
+  "app.title": "Sistem Padanan Perubatan",
+  "step.1.title": "Beritahu kami tentang keadaan anda",
+  "step.1.input_placeholder": "cth., Kanser Paru-paru Tahap 2",
+  "step.1.button": "Cari Doktor",
+  "step.2.title": "Pilih Doktor",
+  "step.2.button": "Teruskan ke Bantuan Amal",
+  "step.3.title": "Pilih Bantuan Kewangan",
+  "step.3.button": "Semak & Jana Surat",
+  "step.4.title": "Semakan Akhir",
+  "step.4.generate": "Jana Surat Sokongan/Visa",
+  "doctor.telegram": "Sembang di Telegram",
+  "charity.website": "Lawati Laman Web",
+  "common.loading": "Memuatkan..."
+}

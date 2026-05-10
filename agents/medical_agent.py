@@ -85,6 +85,7 @@ def _build_candidate(doc_id: str, meta: Dict, doc_text: str, semantic_rank: int 
         "tier": meta.get("tier"),
         "full_registration_number": meta.get("full_registration_number"),
         "mmc_url": meta.get("mmc_url"),
+        "telegram_handle": meta.get("telegram_handle"),
         "rag_summary": doc_text,
         "hospital_location": _infer_hospital_location(meta.get("hospital")),
         "grant_availability": grant_meta["Grant Availability"],

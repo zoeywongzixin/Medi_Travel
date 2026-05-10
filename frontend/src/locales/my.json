@@ -1,0 +1,15 @@
+{
+  "app.title": "Medical Matching Wizard",
+  "step.1.title": "Tell us about your condition",
+  "step.1.input_placeholder": "e.g., Lung Cancer Stage 2",
+  "step.1.button": "Find Doctors",
+  "step.2.title": "Select a Doctor",
+  "step.2.button": "Proceed to Charity Match",
+  "step.3.title": "Select Financial Aid",
+  "step.3.button": "Review & Generate Letter",
+  "step.4.title": "Final Review",
+  "step.4.generate": "Generate Visa/Support Letter",
+  "doctor.telegram": "Chat on Telegram",
+  "charity.website": "Visit Website",
+  "common.loading": "Loading..."
+}

@@ -17,6 +17,8 @@ Country-Priority RAG Logic:
 import json
 from pathlib import Path
 from typing import Dict, List, Optional
+import os
+from tavily import TavilyClient
 
 import chromadb
 from chromadb.utils import embedding_functions
@@ -102,6 +104,9 @@ def match_charities(medical_data: Dict, origin_country: str, budget_usd: float =
             print(f"  [CharityAgent] Budget gap detected: ${gap}. Searching for charities...")
 
     condition = medical_data.get("condition", "general medical")
+
+
+
     allowed_area = _condition_area_for_query(condition)
     if allowed_area is None:
         return []

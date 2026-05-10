@@ -39,9 +39,16 @@ from agents.medical_agent import match_hospitals
 from agents.flight_agent import get_flight_options
 from agents.charity_agent import match_charities
 from utils.llm import check_for_clinical_gaps, normalize_medical_data_for_clarification
-from utils.db import log_match, get_few_shot_feedback
+from utils.db import log_match, get_few_shot_feedback, get_db, User, Selection
+# pyrefly: ignore [missing-import]
+from sqlalchemy.orm import Session
+from fastapi import Depends
+# pyrefly: ignore [missing-import]
+from passlib.context import CryptContext
 from typing import Optional, List
 import uuid
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 app = FastAPI(title="Malaysia Medical Match API", version="1.0.0")
 
@@ -68,6 +75,7 @@ class MatchRequest(BaseModel):
 class LayerRequest(BaseModel):
     medical_data: Dict[str, Any]
     origin_country: str = Field(default="Indonesia", description="Where the patient is flying from")
+    language: Optional[str] = "en"
 
 
 def _build_agent_response(packages: list, manual_override: bool) -> Dict[str, Any]:
@@ -87,6 +95,43 @@ class CombinePackageRequest(BaseModel):
     charity: Optional[Dict[str, Any]] = None
     origin_country: str = Field(default="Indonesia")
     budget_usd: int = Field(default=5000)
+
+class UserCreate(BaseModel):
+    username: str
+    password: str
+
+class SaveSelectionRequest(BaseModel):
+    doctor_id: str
+    charity_id: str
+
+@app.post("/api/v1/register")
+async def register(user: UserCreate, db: Session = Depends(get_db)):
+    db_user = db.query(User).filter(User.username == user.username).first()
+    if db_user:
+        raise HTTPException(status_code=400, detail="Username already registered")
+    hashed_password = pwd_context.hash(user.password)
+    new_user = User(username=user.username, hashed_password=hashed_password)
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return {"message": "User registered successfully"}
+
+@app.post("/api/v1/login")
+async def login(user: UserCreate, db: Session = Depends(get_db)):
+    db_user = db.query(User).filter(User.username == user.username).first()
+    if not db_user or not pwd_context.verify(user.password, db_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Invalid credentials")
+    return {"access_token": db_user.username, "token_type": "bearer"}
+
+@app.post("/api/v1/save-selection")
+async def save_selection(req: SaveSelectionRequest, username: str, db: Session = Depends(get_db)):
+    db_user = db.query(User).filter(User.username == username).first()
+    if not db_user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    selection = Selection(user_id=db_user.id, doctor_id=req.doctor_id, charity_id=req.charity_id)
+    db.add(selection)
+    db.commit()
+    return {"message": "Selection saved"}
 
 @app.get("/")
 def root():
@@ -224,20 +269,68 @@ async def match_packages(request: MatchRequest):
 @app.post("/api/v1/match-hospitals")
 async def api_match_hospitals(request: LayerRequest):
     """Returns top 3 hospitals for the given medical data."""
+    from agents.medical_agent import match_hospitals
     hospitals = match_hospitals(request.medical_data)
+    
+    condition = request.medical_data.get("condition", "your condition")
+    from utils.translator import generate_friendly_reasoning
+    for h in hospitals:
+        h["reasoning"] = generate_friendly_reasoning("hospital/doctor", h, condition, request.language or "en")
+        
     return {"hospitals": hospitals}
 
 @app.post("/api/v1/match-flights")
 async def api_match_flights(request: LayerRequest):
-    """Returns top 3 flights based on logistics needs."""
+    from agents.flight_agent import get_flight_options
+    from agents.logistics_agent import get_transport_requirements
     logistics_data = get_transport_requirements(request.medical_data, origin=request.origin_country, destination="Malaysia")
     logistics = get_flight_options(logistics_data, request.origin_country)
+    
+    condition = request.medical_data.get("condition", "your condition")
+    from utils.translator import generate_friendly_reasoning
+    for f in logistics.get("options", []):
+        f["reasoning"] = generate_friendly_reasoning("flight", f, condition, request.language or "en")
+        
     return {"logistics_data": logistics_data, "flight_options": logistics}
 
 @app.post("/api/v1/match-charities")
 async def api_match_charities(request: LayerRequest):
     """Returns top 3 charities based on medical data and origin."""
+    from agents.charity_agent import match_charities
     charities = match_charities(request.medical_data, request.origin_country)
+    
+    condition = request.medical_data.get("condition", "your condition")
+    from utils.translator import generate_friendly_reasoning
+    
+    import os
+    from tavily import TavilyClient
+    tavily_key = os.getenv("TAVILY_API_KEY")
+    client = TavilyClient(api_key=tavily_key) if tavily_key else None
+    
+    for c in charities:
+        c["reasoning"] = generate_friendly_reasoning("charity", c, condition, request.language or "en")
+        if client:
+            try:
+                res = client.search(f'"{c["name"]}" official website', search_depth="basic", max_results=1)
+                if res.get("results"):
+                    c["website"] = res["results"][0]["url"]
+                else:
+                    c["website"] = "#"
+            except:
+                c["website"] = "#"
+        else:
+            c["website"] = "#"
+        
+    if not charities:
+        charities = [{
+            "id": "fallback_charity",
+            "name": "Global Medical Aid",
+            "organization": "Generic NGO",
+            "max_coverage_usd": 1000,
+            "website": "https://www.who.int",
+            "reasoning": "This fallback option is provided because no specific charities were found in the database for your condition."
+        }]
+        
     return {"charities": charities}
 
 class TranslateTemplateRequest(BaseModel):
@@ -271,6 +364,103 @@ async def api_translate_text(request: TranslateTextRequest):
         return {"translated_text": ""}
     translated = translate_text(request.text, request.target_language)
     return {"translated_text": translated}
+
+class TranslateBatchRequest(BaseModel):
+    texts: Dict[str, str]
+    target_language: str
+
+@app.post("/api/v1/translate-batch")
+async def api_translate_batch(request: TranslateBatchRequest):
+    """Translates a dictionary of strings to the requested language."""
+    if request.target_language.lower() in ["en", "english"]:
+        return {"translated_texts": request.texts}
+    
+    import json
+    from utils.llm import call_gemini
+    
+    prompt = f"Translate the following UI labels and button texts to {request.target_language}. Keep the exact same keys. Return ONLY valid JSON.\n\n{json.dumps(request.texts, ensure_ascii=False)}"
+    
+    # Try Ollama first
+    import requests
+    try:
+        ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+        res = requests.post(
+            f"{ollama_host}/api/generate",
+            json={
+                "model": "llama3.2:3b",
+                "prompt": f"You are a translator helping with administrative UI localization. Return ONLY valid JSON.\n\n{prompt}",
+                "stream": False
+            },
+            timeout=15
+        )
+        if res.status_code == 200:
+            response_text = res.json().get("response", "").strip()
+            if "```json" in response_text:
+                response_text = response_text.split("```json")[1].split("```")[0].strip()
+            elif "```" in response_text:
+                response_text = response_text.split("```")[1].split("```")[0].strip()
+            
+            translated_dict = json.loads(response_text)
+            return {"translated_texts": translated_dict}
+    except Exception as e:
+        print(f"Ollama batch translation failed: {e}")
+        
+    # Fallback to Gemini
+    try:
+        res = call_gemini("You are a translator helping with administrative UI localization. Return ONLY valid JSON.", prompt, model_name="gemini-1.5-flash")
+        response_text = res.get("text", "").strip()
+        
+        if "```json" in response_text:
+            response_text = response_text.split("```json")[1].split("```")[0].strip()
+        elif "```" in response_text:
+            response_text = response_text.split("```")[1].split("```")[0].strip()
+            
+        translated_dict = json.loads(response_text)
+        
+        # Fallback for missing keys
+        for k, v in request.texts.items():
+            if k not in translated_dict:
+                translated_dict[k] = v
+                
+        return {"translated_texts": translated_dict}
+    except Exception as e:
+        print(f"Batch translation error: {e}")
+        # Fallback to individual
+        from utils.translator import translate_text
+        translated_dict = {}
+        for k, v in request.texts.items():
+            try:
+                translated_dict[k] = translate_text(v, request.target_language)
+            except:
+                translated_dict[k] = v
+        return {"translated_texts": translated_dict}
+
+
+class DoctorProfileRequest(BaseModel):
+    doctor_name: str
+    hospital_name: str
+
+@app.post("/api/v1/doctor-profile")
+async def api_doctor_profile(request: DoctorProfileRequest):
+    """Searches for the doctor's official profile page using Tavily."""
+    import os
+    tavily_key = os.getenv("TAVILY_API_KEY")
+    if not tavily_key:
+        return {"profile_url": None, "error": "Tavily API key missing"}
+        
+    try:
+        from tavily import TavilyClient
+        client = TavilyClient(api_key=tavily_key)
+        query = f'"{request.doctor_name}" "{request.hospital_name}" doctor profile site:com OR site:my OR site:sg OR site:id'
+        response = client.search(query, search_depth="basic", max_results=3)
+        results = response.get("results", [])
+        if results:
+            # Return the first URL
+            return {"profile_url": results[0]["url"]}
+        return {"profile_url": None}
+    except Exception as e:
+        print(f"Doctor profile search error: {e}")
+        return {"profile_url": None, "error": str(e)}
 
 @app.post("/api/v1/combine-package")
 async def api_combine_package(request: CombinePackageRequest):

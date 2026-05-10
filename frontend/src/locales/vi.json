@@ -1,0 +1,15 @@
+{
+  "app.title": "Hệ Thống Ghép Nối Y Tế",
+  "step.1.title": "Hãy cho chúng tôi biết về tình trạng của bạn",
+  "step.1.input_placeholder": "vd. Ung thư phổi Giai đoạn 2",
+  "step.1.button": "Tìm Bác Sĩ",
+  "step.2.title": "Chọn Bác Sĩ",
+  "step.2.button": "Tiến hành Ghép Nối Tổ Chức Từ Thiện",
+  "step.3.title": "Chọn Hỗ Trợ Tài Chính",
+  "step.3.button": "Xem lại & Tạo Thư",
+  "step.4.title": "Đánh Giá Cuối Cùng",
+  "step.4.generate": "Tạo Thư Hỗ Trợ/Visa",
+  "doctor.telegram": "Trò chuyện trên Telegram",
+  "charity.website": "Truy cập Trang Web",
+  "common.loading": "Đang tải..."
+}

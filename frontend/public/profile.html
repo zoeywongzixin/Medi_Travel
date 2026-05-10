@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Doctor Profile - Malaysia Medical Match</title>
+    <style>
+        body { 
+          font-family: system-ui, -apple-system, sans-serif; 
+          background: #0b0f19; 
+          color: #f8fafc; 
+          margin: 0; 
+          padding: 1rem; 
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          min-height: 100vh;
+        }
+        .card { 
+          background: rgba(20, 27, 45, 0.7); 
+          backdrop-filter: blur(12px);
+          border: 1px solid rgba(255,255,255,0.1); 
+          border-radius: 1.25rem; 
+          padding: 2.5rem; 
+          max-width: 500px; 
+          width: 100%;
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+        .banner { 
+          background: #e11d48; 
+          color: white; 
+          padding: 0.75rem; 
+          text-align: center; 
+          border-radius: 0.75rem; 
+          margin-bottom: 2rem; 
+          font-weight: 600; 
+          font-size: 0.9rem;
+        }
+        h1 { margin: 0 0 0.5rem 0; font-size: 2rem; color: #fff; }
+        p { color: #94a3b8; line-height: 1.6; }
+        .meta { margin-bottom: 1.5rem; }
+        .meta-item { display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .meta-label { color: #64748b; }
+        .meta-value { color: #3b82f6; font-weight: 500; }
+        .btn { 
+          display: block; 
+          background: linear-gradient(135deg, #3b82f6, #2563eb); 
+          color: white; 
+          padding: 1rem; 
+          border-radius: 0.75rem; 
+          text-decoration: none; 
+          text-align: center;
+          font-weight: 600;
+          transition: all 0.3s;
+          box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+        .btn:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="banner">Note: This is a sample profile for demonstration purposes.</div>
+        <h1 id="doc-name">Dr. Specialist</h1>
+        <p id="doc-hosp" style="color: #3b82f6; font-size: 1.1rem; margin-top: 0;">Hospital Name</p>
+        
+        <div class="meta">
+            <div class="meta-item">
+                <span class="meta-label">Status</span>
+                <span class="meta-value" style="color: #10b981;">Available</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-label">Response Time</span>
+                <span class="meta-value">~24 Hours</span>
+            </div>
+        </div>
+
+        <p>This is a simulated profile page used because the real profile could not be retrieved dynamically or the selected doctor is a generated candidate for this hackathon demonstration.</p>
+        
+        <a href="#" class="btn" onclick="alert('In a real application, this would open a booking form or chat.')">Book Consultation</a>
+    </div>
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        if (params.has('name')) document.getElementById('doc-name').innerText = params.get('name');
+        if (params.has('hospital')) document.getElementById('doc-hosp').innerText = params.get('hospital');
+    </script>
+</body>
+</html>

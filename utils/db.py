@@ -1,68 +1,89 @@
-import sqlite3
 import os
-from typing import List, Dict, Any, Optional
+from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, Text
+from sqlalchemy.orm import sessionmaker, declarative_base
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "mock_db.sqlite")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/medical_matching")
 
-def get_connection():
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+if DATABASE_URL.startswith("sqlite"):
+    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+else:
+    engine = create_engine(DATABASE_URL)
+
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True)
+    hashed_password = Column(String)
+
+class Match(Base):
+    __tablename__ = "matches"
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(String, index=True)
+    status = Column(String)
+    condition = Column(String)
+    hospital = Column(String)
+    flight = Column(String)
+    charity = Column(String)
+    urgency = Column(String)
+    feedback = Column(Text)
+
+class Selection(Base):
+    __tablename__ = "selections"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    doctor_id = Column(String)
+    charity_id = Column(String)
 
 def init_db():
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS matches (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            session_id TEXT,
-            status TEXT,
-            condition TEXT,
-            hospital TEXT,
-            flight TEXT,
-            charity TEXT,
-            urgency TEXT,
-            feedback TEXT
-        )
-    ''')
-    conn.commit()
-    conn.close()
+    Base.metadata.create_all(bind=engine)
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 def log_match(session_id: str, status: str, condition: str, hospital: str, flight: str, charity: str, urgency: str) -> int:
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT INTO matches (session_id, status, condition, hospital, flight, charity, urgency, feedback)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (session_id, status, condition, hospital, flight, charity, urgency, ""))
-    match_id = cursor.lastrowid
-    conn.commit()
-    conn.close()
-    return match_id
+    db = SessionLocal()
+    new_match = Match(
+        session_id=session_id,
+        status=status,
+        condition=condition,
+        hospital=hospital,
+        flight=flight,
+        charity=charity,
+        urgency=urgency,
+        feedback=""
+    )
+    db.add(new_match)
+    db.commit()
+    db.refresh(new_match)
+    db.close()
+    return new_match.id
 
 def update_feedback(match_id: int, feedback: str, new_status: str = "edited"):
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute('''
-        UPDATE matches SET feedback = ?, status = ? WHERE id = ?
-    ''', (feedback, new_status, match_id))
-    conn.commit()
-    conn.close()
+    db = SessionLocal()
+    match = db.query(Match).filter(Match.id == match_id).first()
+    if match:
+        match.feedback = feedback
+        match.status = new_status
+        db.commit()
+    db.close()
 
-def get_few_shot_feedback(condition: str) -> List[Dict[str, Any]]:
-    """Returns previous feedback given by doctors for similar conditions."""
-    conn = get_connection()
-    cursor = conn.cursor()
-    # Simple LIKE matching for the condition
-    cursor.execute('''
-        SELECT condition, feedback FROM matches 
-        WHERE status = 'edited' AND feedback != '' AND condition LIKE ?
-        LIMIT 5
-    ''', (f"%{condition}%",))
-    rows = cursor.fetchall()
-    conn.close()
-    return [{"condition": r["condition"], "feedback": r["feedback"]} for r in rows]
+def get_few_shot_feedback(condition: str):
+    db = SessionLocal()
+    matches = db.query(Match).filter(
+        Match.status == 'edited',
+        Match.feedback != '',
+        Match.condition.ilike(f"%{condition}%")
+    ).limit(5).all()
+    results = [{"condition": m.condition, "feedback": m.feedback} for m in matches]
+    db.close()
+    return results
 
 # Initialize on import
 init_db()

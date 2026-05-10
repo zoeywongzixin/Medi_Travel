@@ -1,80 +1,42 @@
 # ASEAN Medical Match
 
-ASEAN Medical Match is a FastAPI-based medical travel matching system for patients seeking treatment in Malaysia. It combines OCR, privacy scrubbing, translation, clinical structuring, hospital retrieval, logistics planning, charity matching, and printable travel-support documents in one pipeline.
+ASEAN Medical Match is a cutting-edge, agentic AI platform designed for the ASEAN AI Hackathon. It streamlines the medical tourism process for international patients seeking treatment in Malaysia. By combining document AI, local privacy-first translation, multi-agent orchestration, and localized logistics planning, it transforms messy clinical charts into actionable, personalized medical travel packages.
 
 ## What It Does
 
-- Extracts text from chart images or PDFs.
-- Scrubs sensitive patient information before LLM use.
-- Translates OCR output into clean English for downstream reasoning.
-- Structures messy chart text into medical case data.
-- Detects critical clinical gaps and asks follow-up questions when needed.
-- Matches hospitals and specialists from a local ChromaDB store.
-- Estimates transport, travel dates, and financial support.
-- Generates itinerary summaries, visa-support letters, and travel-guidance letters.
+- **Document Ingestion**: Extracts text from medical chart images or PDFs using OCR.
+- **Privacy First**: Scrubs Personally Identifiable Information (PII) before any cloud LLM processing.
+- **Local AI Translation**: Uses local Ollama models to translate medical text and provide empathetic reasoning, bypassing rigid cloud safety filters and ensuring privacy.
+- **Clinical Structuring**: Parses raw chart text into structured JSON data.
+- **Intelligent Orchestration**: Detects clinical gaps and routes data through independent Medical, Logistics, and Charity agents.
+- **RAG-based Matching**: Matches hospitals, specialists, and financial aid from a local ChromaDB vector store.
+- **Logistics Simulation**: Estimates flights and ground transport requirements based on the patient's mobility level.
+- **Document Generation**: Automatically generates customized, translated PDF support documents (Visa Letters, Hospital Referrals, and Travel Guidelines).
 
 ## Project Layout
 
 ```text
 ai_medical_matching/
 |-- app.py                          FastAPI entrypoint and API routes
-|-- agents/                         Retrieval, routing, orchestration, reranking
-|   |-- charity_agent.py
-|   |-- document_agent.py
-|   |-- flight_agent.py
-|   |-- logistics_agent.py
-|   |-- medical_agent.py
-|   |-- orchestrator.py
-|   `-- rerank_agent.py
-|-- data/                           Runtime stores and local sample data
-|   |-- chroma_db/
-|   |-- mock_cases/                 Multilingual sample chart text for demos
-|   |-- mock_db.sqlite
-|   `-- mock_vietnam_nguyen_van_a.txt
-|-- frontend/
-|   `-- pipeline_tester.html        Single-page tester UI
+|-- agents/                         Independent agents (Medical, Logistics, Charity, etc.)
+|-- data/                           Runtime stores (ChromaDB, SQLite mock DB)
+|-- frontend/                       React (Vite) Frontend application
 |-- model_cache/                    Local embedding / ONNX cache
-|-- pipeline/                       Ingestion and reporting scripts
-|   |-- generate_charity_dashboard.py
-|   |-- generate_report.py
-|   |-- ingest_charities.py
-|   |-- ingest_doctors.py
-|   `-- ingest_mock_data.py
+|-- pipeline/                       Ingestion scripts (Doctors, Charities, Mock Data)
 |-- reports/                        Generated HTML dashboards
-|   |-- charity_dashboard.html
-|   `-- db_dashboard.html
-|-- tests/
-|   |-- dev_tools/                  Manual debugging scripts
-|   |-- fixtures/                   OCR sample inputs
-|   `-- test_pipeline.py
-|-- utils/                          Shared OCR, LLM, schema, PDF, and helper modules
-|   |-- currency.py
-|   |-- date_calculator.py
-|   |-- db.py
-|   |-- estimation.py
-|   |-- letter_generator.py
-|   |-- llm.py
-|   |-- medical_specialty.py
-|   |-- ocr_engine.py
-|   |-- parser.py
-|   |-- privacy.py
-|   |-- schemas.py
-|   `-- translator.py
-|-- docker-compose.yml
-|-- Dockerfile
-|-- requirements.txt
-`-- start.sh
+|-- tests/                          Testing framework and fixtures
+|-- utils/                          Shared helpers (OCR, LLM, Privacy, Letter Generation)
+|-- docker-compose.yml              Docker orchestration
+`-- Dockerfile                      Backend container definition
 ```
-
-Generated folders such as `__pycache__/`, `.pytest_cache/`, temporary OCR files, and local binary bundles are intentionally not part of the source layout.
 
 ## Architecture
 
 ```mermaid
 flowchart TD
-    A["Chart Upload<br/>Image or PDF"] --> B["OCR Engine<br/>utils/ocr_engine.py"]
+    A["Chart Upload (React Frontend)"] --> B["OCR Engine<br/>utils/ocr_engine.py"]
     B --> C["Privacy Scrubber<br/>utils/privacy.py"]
-    C --> D["Translation Layer<br/>utils/translator.py"]
+    C --> D["Translation Layer<br/>Ollama (Local) / Gemini"]
     D --> E["Medical Parser<br/>utils/parser.py"]
     E --> F["Clinical Gap Check<br/>utils/llm.py"]
     F --> G["Orchestrator<br/>agents/orchestrator.py"]
@@ -85,14 +47,43 @@ flowchart TD
     I --> L["Package Assembly"]
     J --> L
     K --> L["Package Assembly"]
-    L --> M["Tester UI / API Response<br/>frontend/pipeline_tester.html"]
+    L --> M["React Frontend Response"]
     L --> N["Letter Generation<br/>utils/letter_generator.py"]
-    N --> O["Preview / PDF Endpoints"]
+    N --> O["Download Endpoints (3 PDFs)"]
 
-    P["ChromaDB<br/>data/chroma_db"] --> H
-    P --> J
-    Q["SQLite Match Log<br/>data/mock_db.sqlite"] --> G
+    P["Ollama (llama3.2:3b)"] --> D
+    P --> N
+    Q["ChromaDB<br/>data/chroma_db"] --> H
+    Q --> J
+    R["SQLite Match Log<br/>data/mock_db.sqlite"] --> G
+    S["Tavily API"] --> M
 ```
+
+## Data Sources & Integration
+
+This project leverages both curated local vector stores and real-time live data:
+- **Hospitals & Specialists**: Sourced from accredited Malaysian hospitals recognized by the **Malaysia Healthcare Travel Council (MHTC)**, indexed in **ChromaDB** for fast semantic vector retrieval.
+- **Financial Aid & Charities**: Curated list of medical NGOs and financial aid programs, queried via RAG using **ChromaDB**.
+- **Doctor Profiles**: Real-time validation of doctor profiles and hospital links performed via the **Tavily Search API** to ensure users are directed to accurate, live external links.
+- **Flight Options**: Sourced via simulated logistics or live search (where SerpAPI is configured) to provide realistic travel costs and durations based on patient mobility needs.
+
+## AI Tools & Stack
+
+To deliver a premium, highly secure, and compliant experience, the system uses a hybrid AI architecture:
+- **Ollama (Llama 3.2:3b)**: Runs entirely locally to handle sensitive administrative translations and generate "humanized", empathetic explanations. This is critical as it bypasses cloud safety filters that often incorrectly block medical text, while simultaneously preserving strict patient privacy.
+- **Gemini 1.5 Flash / 2.5 Flash-Lite**: Leveraged for heavy-duty, complex reasoning tasks such as clinical parsing, medical chart gap detection, and complex multi-agent orchestration.
+- **ChromaDB**: Used as a high-performance vector database for Retrieval-Augmented Generation (RAG) to find the most relevant specialists and charities based on semantic similarity to the patient's condition.
+- **FastAPI**: Serves as the robust, high-performance Python backend.
+- **React (Vite)**: Powers the dynamic, professional light-themed wizard frontend with automated locale and origin country selection.
+
+## Implementation Details
+
+- **Agentic Workflow**: Instead of a simple linear prompt-response, the system uses an Orchestrator to coordinate independent "Agents" (Medical, Logistics, Charity). Each agent is responsible for a specific domain, allowing for modular and complex decision-making.
+- **Privacy-First Design**: PII (Personally Identifiable Information) is scrubbed locally before any clinical data is sent to external APIs, ensuring compliance with healthcare privacy standards.
+- **Human-in-the-loop (Dissatisfaction Loop)**: A unique feature allows users to reject the provided doctor options. The system maintains memory of these rejections and triggers a refined search, ensuring the user eventually finds a suitable match.
+
+
+
 
 ## Current Behavior Notes
 

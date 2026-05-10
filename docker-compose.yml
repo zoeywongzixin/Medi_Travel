@@ -22,6 +22,7 @@ services:
       - OLLAMA_HOST=http://ollama:11434
       - CHROMA_ANONYMIZED_TELEMETRY=False
       - ANONYMIZED_TELEMETRY=False
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/medical_matching
       
     volumes:
       - chroma_data:/app/data
@@ -29,7 +30,21 @@ services:
       - ./model_cache:/root/.cache/chroma/onnx_models
     depends_on:
       - ollama
+      - db
+
+  db:
+    image: postgres:15
+    container_name: medical-match-db
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=medical_matching
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
 
 volumes:
   ollama_data:
   chroma_data:
+  postgres_data:

@@ -24,6 +24,8 @@ LETTER_SKELETONS = {
         "Visa Portal Reference:\n"
         "https://malaysiavisa.imi.gov.my/\n"
     ),
+    "hospital_letter": "HOSPITAL LETTER SKELETON",
+    "guidelines": "GUIDELINES SKELETON",
     "visa_support": (
         "OFFICIAL MEDICAL INVITATION\n"
         "Reference: {appointment_id}\n"
@@ -99,7 +101,7 @@ LETTER_SKELETONS = {
     )
 }
 
-VISA_TEMPLATE_KEYS = {"visa_support", "mhtc_visa_support"}
+VISA_TEMPLATE_KEYS = {"visa_support", "mhtc_visa_support", "hospital_letter", "guidelines"}
 GUIDANCE_TEMPLATE_KEYS = {"appointment_conf", "care_guidance"}
 UNICODE_FONT_CANDIDATES = (
     Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
@@ -328,7 +330,46 @@ def build_visa_support_content(
         "Malaysia Medical Match Platform",
     ])
 
-    if template_str in VISA_TEMPLATE_KEYS:
+    if template_str == "hospital_letter":
+        # Return only the Hospital Letter
+        hospital_content = "\n".join([
+            "--------------------------------------------------",
+            "LETTER TO HOSPITAL (APPOINTMENT REQUEST)",
+            "--------------------------------------------------",
+            "To:",
+            f"The Medical Director / Appointment Desk",
+            f"{package_data.get('specialist', {}).get('hospital', 'Selected Hospital')}",
+            "",
+            "Subject: Request for Appointment and Treatment Coordination",
+            "",
+            "Dear Sir/Madam,",
+            "",
+            "This letter is to request an appointment for the patient mentioned above.",
+            f"The patient has been diagnosed with {diagnosis} and requires consultation with {package_data.get('specialist', {}).get('name', 'the specialist')}.",
+            "",
+            "Please confirm availability and necessary preparation steps for the patient's arrival.",
+            "",
+            "Sincerely,",
+            "Patient / Coordinator"
+        ])
+        return hospital_content
+        
+    elif template_str == "guidelines":
+        # Return only the Guidelines
+        guidelines_content = "\n".join([
+            "--------------------------------------------------",
+            "GUIDE: HOW TO APPLY FOR A MEDICAL VISA TO MALAYSIA",
+            "--------------------------------------------------",
+            "Step 1: Complete Borang IM.47 (Medical Treatment Support).",
+            "Step 2: Register on the MYVISA Portal (https://malaysiavisa.imi.gov.my/).",
+            "Step 3: Upload this Support Letter along with your Passport and Medical Reports.",
+            "Step 4: Complete the Malaysia Digital Arrival Card (MDAC) within 3 days before departure.",
+            "Step 5: Proceed to the selected hospital upon arrival for clinical registration."
+        ])
+        return guidelines_content
+
+    if template_str == "visa_support" or template_str in VISA_TEMPLATE_KEYS:
+        # Return only the main content (Visa Support Letter)
         return content
 
     if template_str in GUIDANCE_TEMPLATE_KEYS:

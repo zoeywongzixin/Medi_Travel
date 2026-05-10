@@ -1,0 +1,15 @@
+{
+  "app.title": "Sistem Pencocokan Medis",
+  "step.1.title": "Ceritakan tentang kondisi Anda",
+  "step.1.input_placeholder": "mis., Kanker Paru-paru Stadium 2",
+  "step.1.button": "Cari Dokter",
+  "step.2.title": "Pilih Dokter",
+  "step.2.button": "Lanjut ke Bantuan Amal",
+  "step.3.title": "Pilih Bantuan Keuangan",
+  "step.3.button": "Tinjau & Buat Surat",
+  "step.4.title": "Tinjauan Akhir",
+  "step.4.generate": "Buat Surat Dukungan/Visa",
+  "doctor.telegram": "Obrolan di Telegram",
+  "charity.website": "Kunjungi Situs Web",
+  "common.loading": "Memuat..."
+}

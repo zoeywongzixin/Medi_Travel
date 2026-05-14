@@ -177,6 +177,24 @@ uvicorn app:app --host 0.0.0.0 --port 8000 --reload
 
 Open the tester at [http://localhost:8000/tester](http://localhost:8000/tester).
 
+## Deployment
+
+This project is Docker-ready and can be deployed to any VPS (DigitalOcean, AWS, etc.) with at least **4GB RAM** (required for Ollama).
+
+### Steps to Deploy
+
+1. **Clone the repository** on your server.
+2. **Create a `.env` file** in the root directory and add your API keys (e.g., `GEMINI_API_KEY`).
+3. **Run the application** using Docker Compose:
+   ```bash
+   docker-compose up -d --build
+   ```
+4. **Access the application**:
+   - Frontend: `http://<your-server-ip>:8080`
+   - Backend: `http://<your-server-ip>:8000`
+
+The Nginx configuration in the frontend container automatically proxies API requests to the backend, so no code changes are needed for base deployment.
+
 ## Tests and Debugging
 
 Main test:

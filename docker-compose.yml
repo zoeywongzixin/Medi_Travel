@@ -1,4 +1,14 @@
 services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: medical-match-frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+
   ollama:
     image: ollama/ollama:latest
     container_name: ollama

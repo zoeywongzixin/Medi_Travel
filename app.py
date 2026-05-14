@@ -40,6 +40,12 @@ from agents.flight_agent import get_flight_options
 from agents.charity_agent import match_charities
 from utils.llm import check_for_clinical_gaps, normalize_medical_data_for_clarification
 from utils.db import log_match, get_few_shot_feedback, get_db, User, Selection
+from utils.transparency import (
+    charity_match_transparency,
+    extract_transparency,
+    flight_match_transparency,
+    hospital_match_transparency,
+)
 # pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
 from fastapi import Depends
@@ -176,6 +182,7 @@ async def extract_chart(file: UploadFile = File(...)):
         return {
             "medical_data": structured_data,
             "privacy_logs": privacy_logs,
+            "decision_transparency": extract_transparency(len(privacy_logs or [])),
             "debug": {
                 "raw_text_original": raw_text,
                 "raw_text_scrubbed": safe_raw_text,
@@ -277,7 +284,10 @@ async def api_match_hospitals(request: LayerRequest):
     for h in hospitals:
         h["reasoning"] = generate_friendly_reasoning("hospital/doctor", h, condition, request.language or "en")
         
-    return {"hospitals": hospitals}
+    return {
+        "hospitals": hospitals,
+        "decision_transparency": hospital_match_transparency(request.medical_data),
+    }
 
 @app.post("/api/v1/match-flights")
 async def api_match_flights(request: LayerRequest):
@@ -291,7 +301,13 @@ async def api_match_flights(request: LayerRequest):
     for f in logistics.get("options", []):
         f["reasoning"] = generate_friendly_reasoning("flight", f, condition, request.language or "en")
         
-    return {"logistics_data": logistics_data, "flight_options": logistics}
+    return {
+        "logistics_data": logistics_data,
+        "flight_options": logistics,
+        "decision_transparency": flight_match_transparency(
+            request.origin_country, logistics_data, logistics
+        ),
+    }
 
 @app.post("/api/v1/match-charities")
 async def api_match_charities(request: LayerRequest):
@@ -331,7 +347,12 @@ async def api_match_charities(request: LayerRequest):
             "reasoning": "This fallback option is provided because no specific charities were found in the database for your condition."
         }]
         
-    return {"charities": charities}
+    return {
+        "charities": charities,
+        "decision_transparency": charity_match_transparency(
+            request.origin_country, condition
+        ),
+    }
 
 class TranslateTemplateRequest(BaseModel):
     template_key: str

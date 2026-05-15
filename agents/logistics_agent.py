@@ -121,7 +121,8 @@ def get_transport_requirements(medical_json, origin="Bangkok", destination="Mala
     )
 
     try:
-        res = call_gemini(system_prompt, json.dumps(medical_json), model_name="gemini-2.0-flash")
+        import os
+        res = call_gemini(system_prompt, json.dumps(medical_json), model_name=os.getenv("GEMINI_REASONING_MODEL", "gemini-2.5-flash"))
         content = res.get("text", "").strip()
         json_match = re.search(r"\{.*\}", content, re.DOTALL)
         clean = json_match.group(0) if json_match else content

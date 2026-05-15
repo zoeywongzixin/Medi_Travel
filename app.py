@@ -412,7 +412,7 @@ async def api_translate_batch(request: TranslateBatchRequest):
                 "prompt": f"You are a translator helping with administrative UI localization. Return ONLY valid JSON.\n\n{prompt}",
                 "stream": False
             },
-            timeout=15
+            timeout=60
         )
         if res.status_code == 200:
             response_text = res.json().get("response", "").strip()

@@ -167,7 +167,8 @@ def get_concise_json(english_text):
         if not english_text or len(english_text.strip()) < 5:
             raise ValueError("English text is empty or too short for AI processing.")
 
-        res = call_gemini(system_prompt, f"Extract info from this text: {english_text}", model_name="gemini-2.0-flash")
+        import os
+        res = call_gemini(system_prompt, f"Extract info from this text: {english_text}", model_name=os.getenv("GEMINI_PARSER_MODEL", "gemini-2.5-flash"))
         content = res.get("text", "").strip()
 
         # Extract JSON block

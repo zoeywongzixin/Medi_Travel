@@ -2,7 +2,7 @@
 model_cache/
 
 # Databases & Vector Stores
-data/chroma_db/
+# data/chroma_db/ (Commented out so we can push the pre-built DB)
 data/mock_db.sqlite
 *.sqlite3
 *.bin
